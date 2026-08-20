@@ -47,7 +47,8 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.firebase.auth)
     testImplementation(libs.junit)
-
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.auth)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))

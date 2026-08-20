@@ -1,6 +1,7 @@
 package com.ayesha.guidechat
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -15,7 +16,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -37,6 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -44,6 +45,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ayesha.guidechat.data.AuthRepository
 import com.ayesha.guidechat.ui.theme.GuideChatTheme
 
 class MainActivity : ComponentActivity() {
@@ -69,12 +71,15 @@ fun MentorConnectApp() {
     }
 
     if (showRegisterScreen) {
+
         RegisterScreen(
             onBackToLogin = {
                 showRegisterScreen = false
             }
         )
+
     } else {
+
         LoginScreen(
             onCreateAccount = {
                 showRegisterScreen = true
@@ -83,10 +88,20 @@ fun MentorConnectApp() {
     }
 }
 
+/* =========================================================
+   LOGIN SCREEN
+   ========================================================= */
+
 @Composable
 fun LoginScreen(
     onCreateAccount: () -> Unit
 ) {
+
+    val context = LocalContext.current
+
+    val authRepository = remember {
+        AuthRepository()
+    }
 
     var email by remember {
         mutableStateOf("")
@@ -110,50 +125,77 @@ fun LoginScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 24.dp),
+
             horizontalAlignment = Alignment.CenterHorizontally,
+
             verticalArrangement = Arrangement.Center
         ) {
+
+            /* ---------- LOGO ---------- */
 
             Box(
                 modifier = Modifier
                     .size(82.dp)
                     .clip(CircleShape)
                     .background(Color(0xFFCFFDDC)),
+
                 contentAlignment = Alignment.Center
             ) {
+
                 Text(
                     text = "M",
+
                     color = Color(0xFF2E6F40),
+
                     fontSize = 38.sp,
+
                     fontWeight = FontWeight.Bold
                 )
             }
 
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(
+                modifier = Modifier.height(18.dp)
+            )
+
+            /* ---------- APP NAME ---------- */
 
             Text(
                 text = "MentorConnect",
+
                 fontSize = 30.sp,
+
                 fontWeight = FontWeight.Bold,
+
                 color = Color(0xFF253D2C)
             )
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(
+                modifier = Modifier.height(6.dp)
+            )
 
             Text(
                 text = "Connect • Collaborate • Grow",
+
                 fontSize = 14.sp,
+
                 color = Color(0xFF68BA7F)
             )
 
-            Spacer(modifier = Modifier.height(30.dp))
+            Spacer(
+                modifier = Modifier.height(30.dp)
+            )
+
+            /* ---------- LOGIN CARD ---------- */
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
+
                 shape = RoundedCornerShape(24.dp),
+
                 colors = CardDefaults.cardColors(
                     containerColor = Color.White
                 ),
+
                 elevation = CardDefaults.cardElevation(
                     defaultElevation = 5.dp
                 )
@@ -165,165 +207,320 @@ fun LoginScreen(
 
                     Text(
                         text = "Welcome Back 👋",
+
                         fontSize = 22.sp,
+
                         fontWeight = FontWeight.Bold,
+
                         color = Color(0xFF253D2C)
                     )
 
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(
+                        modifier = Modifier.height(6.dp)
+                    )
 
                     Text(
                         text = "Sign in to continue your conversations",
+
                         fontSize = 14.sp,
+
                         color = Color(0xFF6B756E)
                     )
 
-                    Spacer(modifier = Modifier.height(22.dp))
+                    Spacer(
+                        modifier = Modifier.height(22.dp)
+                    )
+
+                    /* ---------- EMAIL ---------- */
 
                     OutlinedTextField(
                         value = email,
+
                         onValueChange = {
                             email = it
                         },
+
                         modifier = Modifier.fillMaxWidth(),
+
                         singleLine = true,
+
                         label = {
                             Text("Email")
                         },
+
                         placeholder = {
                             Text("Enter your email")
                         },
+
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Email
                         ),
+
                         shape = RoundedCornerShape(14.dp),
+
                         colors = OutlinedTextFieldDefaults.colors(
+
                             focusedBorderColor = Color(0xFF2E6F40),
+
                             unfocusedBorderColor = Color(0xFFD5DED7),
+
                             focusedLabelColor = Color(0xFF2E6F40),
+
                             cursorColor = Color(0xFF2E6F40)
                         )
                     )
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(
+                        modifier = Modifier.height(14.dp)
+                    )
+
+                    /* ---------- PASSWORD ---------- */
 
                     OutlinedTextField(
                         value = password,
+
                         onValueChange = {
                             password = it
                         },
+
                         modifier = Modifier.fillMaxWidth(),
+
                         singleLine = true,
+
                         label = {
                             Text("Password")
                         },
+
                         placeholder = {
                             Text("Enter your password")
                         },
-                        visualTransformation = if (passwordVisible) {
-                            VisualTransformation.None
-                        } else {
-                            PasswordVisualTransformation()
-                        },
+
+                        visualTransformation =
+                            if (passwordVisible) {
+                                VisualTransformation.None
+                            } else {
+                                PasswordVisualTransformation()
+                            },
+
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Password
                         ),
+
                         trailingIcon = {
+
                             TextButton(
                                 onClick = {
-                                    passwordVisible = !passwordVisible
+                                    passwordVisible =
+                                        !passwordVisible
                                 }
                             ) {
+
                                 Text(
-                                    text = if (passwordVisible) "Hide" else "Show",
-                                    color = Color(0xFF2E6F40)
+                                    text =
+                                        if (passwordVisible) {
+                                            "Hide"
+                                        } else {
+                                            "Show"
+                                        },
+
+                                    color = Color(0xFF2E6F40),
+
+                                    fontWeight = FontWeight.Medium
                                 )
                             }
                         },
+
                         shape = RoundedCornerShape(14.dp),
+
                         colors = OutlinedTextFieldDefaults.colors(
+
                             focusedBorderColor = Color(0xFF2E6F40),
+
                             unfocusedBorderColor = Color(0xFFD5DED7),
+
                             focusedLabelColor = Color(0xFF2E6F40),
+
                             cursorColor = Color(0xFF2E6F40)
                         )
                     )
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(
+                        modifier = Modifier.height(8.dp)
+                    )
+
+                    /* ---------- FORGOT PASSWORD ---------- */
 
                     TextButton(
                         onClick = {
-                            // Firebase password reset will be added later.
+
+                            Toast.makeText(
+                                context,
+                                "Password reset will be added soon",
+                                Toast.LENGTH_SHORT
+                            ).show()
                         },
-                        modifier = Modifier.align(Alignment.End)
+
+                        modifier = Modifier.align(
+                            Alignment.End
+                        )
                     ) {
+
                         Text(
                             text = "Forgot password?",
+
                             color = Color(0xFF2E6F40),
+
                             fontSize = 13.sp
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(
+                        modifier = Modifier.height(8.dp)
+                    )
+
+                    /* ---------- LOGIN BUTTON ---------- */
 
                     Button(
                         onClick = {
-                            // Firebase login will be added later.
+
+                            if (email.isBlank()) {
+
+                                Toast.makeText(
+                                    context,
+                                    "Please enter your email",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+
+                                return@Button
+                            }
+
+                            if (password.isBlank()) {
+
+                                Toast.makeText(
+                                    context,
+                                    "Please enter your password",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+
+                                return@Button
+                            }
+
+                            authRepository.login(
+                                email = email.trim(),
+                                password = password
+                            ) { success, error ->
+
+                                if (success) {
+
+                                    Toast.makeText(
+                                        context,
+                                        "Login successful!",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+
+                                    // Home screen will be added next.
+
+                                } else {
+
+                                    Toast.makeText(
+                                        context,
+                                        error ?: "Login failed",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            }
                         },
+
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(54.dp),
+
                         shape = RoundedCornerShape(14.dp),
+
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF2E6F40)
+                            containerColor = Color(0xFF2E6F40),
+
+                            contentColor = Color.White
                         )
                     ) {
+
                         Text(
                             text = "SIGN IN",
+
                             fontSize = 15.sp,
+
                             fontWeight = FontWeight.Bold
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(18.dp))
+                    Spacer(
+                        modifier = Modifier.height(18.dp)
+                    )
+
+                    /* ---------- CREATE ACCOUNT ---------- */
 
                     Text(
                         text = "New to MentorConnect?",
+
                         modifier = Modifier.fillMaxWidth(),
+
                         textAlign = TextAlign.Center,
+
                         fontSize = 13.sp,
+
                         color = Color(0xFF6B756E)
                     )
 
                     TextButton(
                         onClick = onCreateAccount,
-                        modifier = Modifier.align(Alignment.CenterHorizontally)
+
+                        modifier = Modifier.align(
+                            Alignment.CenterHorizontally
+                        )
                     ) {
+
                         Text(
                             text = "Create an account",
+
                             color = Color(0xFF2E6F40),
+
                             fontWeight = FontWeight.Bold
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(22.dp))
+            Spacer(
+                modifier = Modifier.height(22.dp)
+            )
 
             Text(
                 text = "Secure communication for interns & mentors",
+
                 fontSize = 12.sp,
+
                 color = Color(0xFF6B756E),
+
                 textAlign = TextAlign.Center
             )
         }
     }
 }
 
+/* =========================================================
+   REGISTRATION SCREEN
+   ========================================================= */
+
 @Composable
 fun RegisterScreen(
     onBackToLogin: () -> Unit
 ) {
+
+    val context = LocalContext.current
+
+    val authRepository = remember {
+        AuthRepository()
+    }
 
     var name by remember {
         mutableStateOf("")
@@ -359,50 +556,77 @@ fun RegisterScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 24.dp),
+
             horizontalAlignment = Alignment.CenterHorizontally,
+
             verticalArrangement = Arrangement.Center
         ) {
+
+            /* ---------- LOGO ---------- */
 
             Box(
                 modifier = Modifier
                     .size(68.dp)
                     .clip(CircleShape)
                     .background(Color(0xFFCFFDDC)),
+
                 contentAlignment = Alignment.Center
             ) {
+
                 Text(
                     text = "M",
+
                     color = Color(0xFF2E6F40),
+
                     fontSize = 32.sp,
+
                     fontWeight = FontWeight.Bold
                 )
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(
+                modifier = Modifier.height(14.dp)
+            )
+
+            /* ---------- TITLE ---------- */
 
             Text(
                 text = "Create Account",
+
                 fontSize = 28.sp,
+
                 fontWeight = FontWeight.Bold,
+
                 color = Color(0xFF253D2C)
             )
 
-            Spacer(modifier = Modifier.height(5.dp))
+            Spacer(
+                modifier = Modifier.height(5.dp)
+            )
 
             Text(
                 text = "Join your internship community",
+
                 fontSize = 14.sp,
+
                 color = Color(0xFF68BA7F)
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(
+                modifier = Modifier.height(24.dp)
+            )
+
+            /* ---------- REGISTER CARD ---------- */
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
+
                 shape = RoundedCornerShape(24.dp),
+
                 colors = CardDefaults.cardColors(
                     containerColor = Color.White
                 ),
+
                 elevation = CardDefaults.cardElevation(
                     defaultElevation = 5.dp
                 )
@@ -412,149 +636,240 @@ fun RegisterScreen(
                     modifier = Modifier.padding(22.dp)
                 ) {
 
+                    /* ---------- NAME ---------- */
+
                     OutlinedTextField(
                         value = name,
+
                         onValueChange = {
                             name = it
                         },
+
                         modifier = Modifier.fillMaxWidth(),
+
                         singleLine = true,
+
                         label = {
                             Text("Full Name")
                         },
+
                         placeholder = {
                             Text("Enter your name")
                         },
+
                         shape = RoundedCornerShape(14.dp),
+
                         colors = OutlinedTextFieldDefaults.colors(
+
                             focusedBorderColor = Color(0xFF2E6F40),
+
                             unfocusedBorderColor = Color(0xFFD5DED7),
+
                             focusedLabelColor = Color(0xFF2E6F40),
+
                             cursorColor = Color(0xFF2E6F40)
                         )
                     )
 
-                    Spacer(modifier = Modifier.height(13.dp))
+                    Spacer(
+                        modifier = Modifier.height(13.dp)
+                    )
+
+                    /* ---------- EMAIL ---------- */
 
                     OutlinedTextField(
                         value = email,
+
                         onValueChange = {
                             email = it
                         },
+
                         modifier = Modifier.fillMaxWidth(),
+
                         singleLine = true,
+
                         label = {
                             Text("Email")
                         },
+
                         placeholder = {
                             Text("Enter your email")
                         },
+
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Email
                         ),
+
                         shape = RoundedCornerShape(14.dp),
+
                         colors = OutlinedTextFieldDefaults.colors(
+
                             focusedBorderColor = Color(0xFF2E6F40),
+
                             unfocusedBorderColor = Color(0xFFD5DED7),
+
                             focusedLabelColor = Color(0xFF2E6F40),
+
                             cursorColor = Color(0xFF2E6F40)
                         )
                     )
 
-                    Spacer(modifier = Modifier.height(13.dp))
+                    Spacer(
+                        modifier = Modifier.height(13.dp)
+                    )
+
+                    /* ---------- PASSWORD ---------- */
 
                     OutlinedTextField(
                         value = password,
+
                         onValueChange = {
                             password = it
                         },
+
                         modifier = Modifier.fillMaxWidth(),
+
                         singleLine = true,
+
                         label = {
                             Text("Password")
                         },
+
                         placeholder = {
                             Text("Create a password")
                         },
-                        visualTransformation = if (passwordVisible) {
-                            VisualTransformation.None
-                        } else {
-                            PasswordVisualTransformation()
-                        },
+
+                        visualTransformation =
+                            if (passwordVisible) {
+                                VisualTransformation.None
+                            } else {
+                                PasswordVisualTransformation()
+                            },
+
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Password
                         ),
+
                         trailingIcon = {
+
                             TextButton(
                                 onClick = {
-                                    passwordVisible = !passwordVisible
+                                    passwordVisible =
+                                        !passwordVisible
                                 }
                             ) {
+
                                 Text(
-                                    text = if (passwordVisible) "Hide" else "Show",
+                                    text =
+                                        if (passwordVisible) {
+                                            "Hide"
+                                        } else {
+                                            "Show"
+                                        },
+
                                     color = Color(0xFF2E6F40)
                                 )
                             }
                         },
+
                         shape = RoundedCornerShape(14.dp),
+
                         colors = OutlinedTextFieldDefaults.colors(
+
                             focusedBorderColor = Color(0xFF2E6F40),
+
                             unfocusedBorderColor = Color(0xFFD5DED7),
+
                             focusedLabelColor = Color(0xFF2E6F40),
+
                             cursorColor = Color(0xFF2E6F40)
                         )
                     )
 
-                    Spacer(modifier = Modifier.height(13.dp))
+                    Spacer(
+                        modifier = Modifier.height(13.dp)
+                    )
+
+                    /* ---------- CONFIRM PASSWORD ---------- */
 
                     OutlinedTextField(
                         value = confirmPassword,
+
                         onValueChange = {
                             confirmPassword = it
                         },
+
                         modifier = Modifier.fillMaxWidth(),
+
                         singleLine = true,
+
                         label = {
                             Text("Confirm Password")
                         },
+
                         placeholder = {
                             Text("Repeat your password")
                         },
-                        visualTransformation = PasswordVisualTransformation(),
+
+                        visualTransformation =
+                            PasswordVisualTransformation(),
+
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Password
                         ),
+
                         shape = RoundedCornerShape(14.dp),
+
                         colors = OutlinedTextFieldDefaults.colors(
+
                             focusedBorderColor = Color(0xFF2E6F40),
+
                             unfocusedBorderColor = Color(0xFFD5DED7),
+
                             focusedLabelColor = Color(0xFF2E6F40),
+
                             cursorColor = Color(0xFF2E6F40)
                         )
                     )
 
-                    Spacer(modifier = Modifier.height(18.dp))
+                    Spacer(
+                        modifier = Modifier.height(18.dp)
+                    )
+
+                    /* ---------- ROLE ---------- */
 
                     Text(
                         text = "I am a...",
+
                         fontSize = 14.sp,
+
                         fontWeight = FontWeight.SemiBold,
+
                         color = Color(0xFF253D2C)
                     )
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(
+                        modifier = Modifier.height(4.dp)
+                    )
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
+
+                        verticalAlignment =
+                            Alignment.CenterVertically
                     ) {
 
                         Row(
-                            verticalAlignment = Alignment.CenterVertically,
+                            verticalAlignment =
+                                Alignment.CenterVertically,
+
                             modifier = Modifier.weight(1f)
                         ) {
+
                             RadioButton(
-                                selected = selectedRole == "Intern",
+                                selected =
+                                    selectedRole == "Intern",
+
                                 onClick = {
                                     selectedRole = "Intern"
                                 }
@@ -562,16 +877,22 @@ fun RegisterScreen(
 
                             Text(
                                 text = "Intern",
+
                                 color = Color(0xFF253D2C)
                             )
                         }
 
                         Row(
-                            verticalAlignment = Alignment.CenterVertically,
+                            verticalAlignment =
+                                Alignment.CenterVertically,
+
                             modifier = Modifier.weight(1f)
                         ) {
+
                             RadioButton(
-                                selected = selectedRole == "Mentor",
+                                selected =
+                                    selectedRole == "Mentor",
+
                                 onClick = {
                                     selectedRole = "Mentor"
                                 }
@@ -579,41 +900,131 @@ fun RegisterScreen(
 
                             Text(
                                 text = "Mentor",
+
                                 color = Color(0xFF253D2C)
                             )
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(
+                        modifier = Modifier.height(14.dp)
+                    )
+
+                    /* ---------- CREATE ACCOUNT ---------- */
 
                     Button(
                         onClick = {
-                            // Firebase registration will be added next.
+
+                            when {
+
+                                name.isBlank() -> {
+
+                                    Toast.makeText(
+                                        context,
+                                        "Please enter your name",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+
+                                email.isBlank() -> {
+
+                                    Toast.makeText(
+                                        context,
+                                        "Please enter your email",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+
+                                password.length < 6 -> {
+
+                                    Toast.makeText(
+                                        context,
+                                        "Password must be at least 6 characters",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+
+                                password != confirmPassword -> {
+
+                                    Toast.makeText(
+                                        context,
+                                        "Passwords do not match",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+
+                                else -> {
+
+                                    authRepository.register(
+                                        email = email.trim(),
+                                        password = password
+                                    ) { success, error ->
+
+                                        if (success) {
+
+                                            Toast.makeText(
+                                                context,
+                                                "Account created successfully!",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+
+                                            onBackToLogin()
+
+                                        } else {
+
+                                            Toast.makeText(
+                                                context,
+                                                error
+                                                    ?: "Registration failed",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        }
+                                    }
+                                }
+                            }
                         },
+
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(54.dp),
+
                         shape = RoundedCornerShape(14.dp),
+
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = Color(0xFF2E6F40)
+                            containerColor = Color(0xFF2E6F40),
+
+                            contentColor = Color.White
                         )
                     ) {
+
                         Text(
                             text = "CREATE ACCOUNT",
+
                             fontSize = 14.sp,
+
                             fontWeight = FontWeight.Bold
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(
+                        modifier = Modifier.height(8.dp)
+                    )
+
+                    /* ---------- BACK TO LOGIN ---------- */
 
                     TextButton(
                         onClick = onBackToLogin,
-                        modifier = Modifier.align(Alignment.CenterHorizontally)
+
+                        modifier = Modifier.align(
+                            Alignment.CenterHorizontally
+                        )
                     ) {
-                        Text(
+
+           git status             Text(
                             text = "Already have an account? Sign in",
+
                             color = Color(0xFF2E6F40),
+
                             fontWeight = FontWeight.SemiBold
                         )
                     }
