@@ -29,6 +29,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,8 +48,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ayesha.guidechat.data.AuthRepository
+import com.ayesha.guidechat.data.ConversationRepository
 import com.ayesha.guidechat.data.UserRepository
 import com.ayesha.guidechat.model.UserProfile
+import com.ayesha.guidechat.ui.ChatPreview
 import com.ayesha.guidechat.ui.ChatScreen
 import com.ayesha.guidechat.ui.HomeScreen
 import com.ayesha.guidechat.ui.UserSearchScreen
@@ -98,6 +101,58 @@ fun GuideChatApp() {
 
     val userRepository = remember {
         UserRepository()
+    }
+
+    val conversationRepository = remember {
+        ConversationRepository()
+    }
+
+    var conversations by remember {
+        mutableStateOf<List<ChatPreview>>(emptyList())
+    }
+
+    var isLoadingConversations by remember {
+        mutableStateOf(false)
+    }
+
+    var conversationError by remember {
+        mutableStateOf<String?>(null)
+    }
+
+    DisposableEffect(currentScreen) {
+
+        val firebaseUser =
+            FirebaseAuth.getInstance().currentUser
+
+        if (currentScreen == "home" && firebaseUser != null) {
+
+            isLoadingConversations = true
+            conversationError = null
+
+            val listener =
+                conversationRepository.listenForConversations(
+                    currentUserId = firebaseUser.uid,
+
+                    onConversationsChanged = { result ->
+                        conversations = result
+                        isLoadingConversations = false
+                        conversationError = null
+                    },
+
+                    onError = { error ->
+                        isLoadingConversations = false
+                        conversationError = error
+                    }
+                )
+
+            onDispose {
+                listener.remove()
+            }
+
+        } else {
+
+            onDispose { }
+        }
     }
 
     LaunchedEffect(currentScreen) {
@@ -178,10 +233,32 @@ fun GuideChatApp() {
             HomeScreen(
                 userName = displayName,
 
+                conversations = conversations,
+
+                isLoadingConversations =
+                    isLoadingConversations,
+
+                conversationError =
+                    conversationError,
+
                 onChatClick = { chat ->
 
-                    // Existing conversations will be connected
-                    // after the first Firestore message step.
+                    if (chat.userId.isNotBlank()) {
+
+                        userRepository.getUserProfile(
+                            uid = chat.userId,
+
+                            onSuccess = { profile ->
+                                selectedUser = profile
+                                currentScreen = "chat"
+                            },
+
+                            onError = { error ->
+                                conversationError =
+                                    error ?: "Unable to open chat"
+                            }
+                        )
+                    }
                 },
 
                 onNewChatClick = {

@@ -2,6 +2,7 @@ package com.ayesha.guidechat.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.runtime.remember
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -34,13 +36,14 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -52,49 +55,61 @@ private val Background = Color(0xFFF7FAF7)
 
 data class ChatPreview(
     val userId: String = "",
-    val name: String,
-    val message: String,
-    val time: String,
+    val name: String = "",
+    val message: String = "",
+    val time: String = "",
     val unreadCount: Int = 0,
     val isOnline: Boolean = false,
+    val timestamp: Long = 0L,
     val isGroup: Boolean = false
 )
 
 @Composable
 fun HomeScreen(
-    userName: String,
-    onChatClick: (ChatPreview) -> Unit,
-    onNewChatClick: () -> Unit,
-    onSearchClick: () -> Unit
+    userName: String = "User",
+    conversations: List<ChatPreview> = emptyList(),
+    isLoadingConversations: Boolean = false,
+    conversationError: String? = null,
+    onChatClick: (ChatPreview) -> Unit = {},
+    onNewChatClick: () -> Unit = {},
+    onSearchClick: () -> Unit = {}
 ) {
+    var searchText by remember {
+        mutableStateOf("")
+    }
 
     var selectedBottomItem by remember {
         mutableIntStateOf(0)
     }
 
+    val filteredConversations =
+        conversations.filter { chat ->
+            chat.name.contains(
+                searchText,
+                ignoreCase = true
+            )
+        }
+
     Scaffold(
         containerColor = Background,
 
         bottomBar = {
-
             NavigationBar(
                 containerColor = Color.White
             ) {
 
                 NavigationBarItem(
                     selected = selectedBottomItem == 0,
-
                     onClick = {
                         selectedBottomItem = 0
                     },
-
                     icon = {
                         Icon(
                             imageVector = Icons.Default.ChatBubble,
-                            contentDescription = "Chats"
+                            contentDescription = "Chats",
+                            tint = DarkText
                         )
                     },
-
                     label = {
                         Text("Chats")
                     }
@@ -102,18 +117,16 @@ fun HomeScreen(
 
                 NavigationBarItem(
                     selected = selectedBottomItem == 1,
-
                     onClick = {
                         selectedBottomItem = 1
                     },
-
                     icon = {
                         Icon(
                             imageVector = Icons.Default.Groups,
-                            contentDescription = "Groups"
+                            contentDescription = "Groups",
+                            tint = DarkText
                         )
                     },
-
                     label = {
                         Text("Groups")
                     }
@@ -121,18 +134,16 @@ fun HomeScreen(
 
                 NavigationBarItem(
                     selected = selectedBottomItem == 2,
-
                     onClick = {
                         selectedBottomItem = 2
                     },
-
                     icon = {
                         Icon(
                             imageVector = Icons.Default.Person,
-                            contentDescription = "Profile"
+                            contentDescription = "Profile",
+                            tint = DarkText
                         )
                     },
-
                     label = {
                         Text("Me")
                     }
@@ -141,18 +152,14 @@ fun HomeScreen(
         },
 
         floatingActionButton = {
-
             FloatingActionButton(
                 onClick = onNewChatClick,
-
                 containerColor = DarkGreen,
-
                 contentColor = Color.White
             ) {
-
                 Icon(
                     imageVector = Icons.Default.Add,
-                    contentDescription = "New conversation"
+                    contentDescription = "New chat"
                 )
             }
         }
@@ -170,15 +177,13 @@ fun HomeScreen(
                 modifier = Modifier.height(24.dp)
             )
 
-
+            // =================================================
             // HEADER
-
+            // =================================================
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-
                 verticalAlignment = Alignment.CenterVertically,
-
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
 
@@ -186,9 +191,7 @@ fun HomeScreen(
 
                     Text(
                         text = "Good morning 👋",
-
                         fontSize = 14.sp,
-
                         color = Color.Gray
                     )
 
@@ -198,11 +201,8 @@ fun HomeScreen(
 
                     Text(
                         text = userName,
-
                         fontSize = 27.sp,
-
                         fontWeight = FontWeight.Bold,
-
                         color = DarkText
                     )
                 }
@@ -220,12 +220,10 @@ fun HomeScreen(
                         text = userName
                             .firstOrNull()
                             ?.uppercase()
-                            ?: "?",
+                            ?: "U",
 
                         fontSize = 18.sp,
-
                         fontWeight = FontWeight.Bold,
-
                         color = DarkGreen
                     )
                 }
@@ -235,40 +233,30 @@ fun HomeScreen(
                 modifier = Modifier.height(22.dp)
             )
 
-
+            // =================================================
             // SEARCH
-
+            // =================================================
 
             TextField(
-                value = "",
+                value = searchText,
 
                 onValueChange = {
-                    // We open the real Firebase search screen.
+                    searchText = it
                 },
 
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp)
-                    .clickable {
-                        onSearchClick()
-                    },
-
-                enabled = false,
+                    .height(54.dp),
 
                 placeholder = {
-                    Text(
-                        text = "Search interns & mentors..."
-                    )
+                    Text("Search conversations...")
                 },
 
                 leadingIcon = {
-
                     Icon(
                         imageVector = Icons.Default.Search,
-
                         contentDescription = "Search",
-
-                        tint = DarkGreen
+                        tint = DarkText
                     )
                 },
 
@@ -277,16 +265,11 @@ fun HomeScreen(
                 shape = RoundedCornerShape(16.dp),
 
                 colors = TextFieldDefaults.colors(
-
+                    focusedContainerColor = Color.White,
+                    unfocusedContainerColor = Color.White,
                     disabledContainerColor = Color.White,
-
-                    disabledTextColor = DarkText,
-
-                    disabledPlaceholderColor = Color.Gray,
-
-                    disabledLeadingIconColor = DarkGreen,
-
-                    disabledIndicatorColor = Color.Transparent
+                    focusedIndicatorColor = Color.Transparent,
+                    unfocusedIndicatorColor = Color.Transparent
                 )
             )
 
@@ -294,39 +277,29 @@ fun HomeScreen(
                 modifier = Modifier.height(26.dp)
             )
 
-
+            // =================================================
             // MESSAGES HEADER
-
+            // =================================================
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-
                 verticalAlignment = Alignment.CenterVertically,
-
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
 
                 Text(
                     text = "Messages",
-
                     fontSize = 21.sp,
-
                     fontWeight = FontWeight.Bold,
-
                     color = DarkText
                 )
 
                 IconButton(
-                    onClick = {
-                        // Later: message options
-                    }
+                    onClick = {}
                 ) {
-
                     Icon(
                         imageVector = Icons.Default.MoreVert,
-
                         contentDescription = "More options",
-
                         tint = DarkText
                     )
                 }
@@ -336,80 +309,346 @@ fun HomeScreen(
                 modifier = Modifier.height(8.dp)
             )
 
+            // =================================================
+            // LOADING
+            // =================================================
 
-            // EMPTY CONVERSATION STATE
+            if (isLoadingConversations) {
 
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-
-                contentAlignment = Alignment.Center
-            ) {
-
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    contentAlignment = Alignment.Center
                 ) {
 
-                    Box(
-                        modifier = Modifier
-                            .size(100.dp)
-                            .clip(CircleShape)
-                            .background(LightMint),
+                    Text(
+                        text = "Loading conversations...",
+                        color = Color.Gray,
+                        fontSize = 14.sp
+                    )
+                }
 
-                        contentAlignment = Alignment.Center
+            } else if (conversationError != null) {
+
+                // =============================================
+                // ERROR
+                // =============================================
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+
+                    contentAlignment = Alignment.Center
+                ) {
+
+                    Column(
+                        horizontalAlignment =
+                            Alignment.CenterHorizontally
                     ) {
 
-                        Icon(
-                            imageVector = Icons.Default.ChatBubble,
+                        Text(
+                            text = "Unable to load conversations",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = DarkText
+                        )
 
-                            contentDescription = null,
+                        Spacer(
+                            modifier = Modifier.height(6.dp)
+                        )
 
-                            tint = DarkGreen,
-
-                            modifier = Modifier.size(42.dp)
+                        Text(
+                            text = conversationError,
+                            fontSize = 13.sp,
+                            color = Color.Gray
                         )
                     }
+                }
 
-                    Spacer(
-                        modifier = Modifier.height(22.dp)
-                    )
+            } else if (filteredConversations.isEmpty()) {
+
+                // =============================================
+                // EMPTY STATE
+                // =============================================
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+
+                    contentAlignment = Alignment.Center
+                ) {
+
+                    Column(
+                        horizontalAlignment =
+                            Alignment.CenterHorizontally
+                    ) {
+
+                        Box(
+                            modifier = Modifier
+                                .size(90.dp)
+                                .clip(CircleShape)
+                                .background(LightMint),
+
+                            contentAlignment = Alignment.Center
+                        ) {
+
+                            Icon(
+                                imageVector =
+                                    Icons.Default.ChatBubble,
+
+                                contentDescription =
+                                    "No conversations",
+
+                                tint = DarkGreen,
+
+                                modifier =
+                                    Modifier.size(40.dp)
+                            )
+                        }
+
+                        Spacer(
+                            modifier = Modifier.height(18.dp)
+                        )
+
+                        Text(
+                            text =
+                                if (searchText.isBlank()) {
+                                    "No conversations yet"
+                                } else {
+                                    "No conversations found"
+                                },
+
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = DarkText
+                        )
+
+                        Spacer(
+                            modifier = Modifier.height(6.dp)
+                        )
+
+                        Text(
+                            text =
+                                if (searchText.isBlank()) {
+                                    "Start a conversation with an intern or mentor."
+                                } else {
+                                    "Try searching for another name."
+                                },
+
+                            fontSize = 14.sp,
+                            color = Color.Gray
+                        )
+                    }
+                }
+
+            } else {
+
+                // =============================================
+                // REAL CONVERSATION LIST
+                // =============================================
+
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+
+                    verticalArrangement =
+                        Arrangement.spacedBy(10.dp)
+                ) {
+
+                    items(
+                        items = filteredConversations,
+
+                        key = { chat ->
+                            chat.userId
+                        }
+                    ) { chat ->
+
+                        ChatListItem(
+                            chat = chat,
+
+                            onClick = {
+                                onChatClick(chat)
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ChatListItem(
+    chat: ChatPreview,
+    onClick: () -> Unit
+) {
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(Color.White)
+            .clickable {
+                onClick()
+            }
+            .padding(14.dp),
+
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+
+        // =====================================================
+        // AVATAR
+        // =====================================================
+
+        Box(
+            modifier = Modifier
+                .size(54.dp)
+                .clip(CircleShape)
+                .background(
+                    if (chat.isGroup) {
+                        LightMint
+                    } else {
+                        Color(0xFFE8F4EA)
+                    }
+                ),
+
+            contentAlignment = Alignment.Center
+        ) {
+
+            if (chat.isGroup) {
+
+                Icon(
+                    imageVector = Icons.Default.Groups,
+                    contentDescription = "Group",
+                    tint = DarkGreen
+                )
+
+            } else {
+
+                Text(
+                    text = chat.name
+                        .firstOrNull()
+                        ?.uppercase()
+                        ?: "?",
+
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = DarkGreen
+                )
+            }
+
+            if (
+                chat.isOnline &&
+                !chat.isGroup
+            ) {
+
+                Box(
+                    modifier = Modifier
+                        .size(12.dp)
+                        .clip(CircleShape)
+                        .background(MediumGreen)
+                        .align(Alignment.BottomEnd)
+                )
+            }
+        }
+
+        Spacer(
+            modifier = Modifier.size(13.dp)
+        )
+
+        // =====================================================
+        // CHAT INFORMATION
+        // =====================================================
+
+        Column(
+            modifier = Modifier.weight(1f)
+        ) {
+
+            Text(
+                text = chat.name,
+
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = DarkText,
+
+                maxLines = 1,
+
+                overflow =
+                    TextOverflow.Ellipsis
+            )
+
+            Spacer(
+                modifier = Modifier.height(4.dp)
+            )
+
+            Text(
+                text =
+                    if (chat.message.isBlank()) {
+                        "Start a conversation"
+                    } else {
+                        chat.message
+                    },
+
+                fontSize = 13.sp,
+                color = Color.Gray,
+
+                maxLines = 1,
+
+                overflow =
+                    TextOverflow.Ellipsis
+            )
+        }
+
+        Spacer(
+            modifier = Modifier.size(8.dp)
+        )
+
+        Column(
+            horizontalAlignment =
+                Alignment.End
+        ) {
+
+            Text(
+                text = chat.time,
+
+                fontSize = 11.sp,
+
+                color = Color.Gray
+            )
+
+            if (chat.unreadCount > 0) {
+
+                Spacer(
+                    modifier = Modifier.height(5.dp)
+                )
+
+                Box(
+                    modifier = Modifier
+                        .size(20.dp)
+                        .clip(CircleShape)
+                        .background(DarkGreen),
+
+                    contentAlignment = Alignment.Center
+                ) {
 
                     Text(
-                        text = "No conversations yet",
+                        text =
+                            if (chat.unreadCount > 9) {
+                                "9+"
+                            } else {
+                                chat.unreadCount.toString()
+                            },
 
-                        fontSize = 21.sp,
+                        fontSize = 10.sp,
 
                         fontWeight = FontWeight.Bold,
 
-                        color = DarkText
-                    )
-
-                    Spacer(
-                        modifier = Modifier.height(8.dp)
-                    )
-
-                    Text(
-                        text = "Start a conversation with an intern or mentor.",
-
-                        fontSize = 14.sp,
-
-                        color = Color.Gray
-                    )
-
-                    Spacer(
-                        modifier = Modifier.height(20.dp)
-                    )
-
-                    Text(
-                        text = "Tap + to find someone",
-
-                        fontSize = 14.sp,
-
-                        fontWeight = FontWeight.Medium,
-
-                        color = DarkGreen
+                        color = Color.White
                     )
                 }
             }
