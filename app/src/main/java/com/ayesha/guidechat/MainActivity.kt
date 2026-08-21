@@ -1,6 +1,5 @@
 package com.ayesha.guidechat
 
-import com.ayesha.guidechat.ui.HomeScreen
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -49,9 +48,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ayesha.guidechat.data.AuthRepository
 import com.ayesha.guidechat.data.UserRepository
-import com.google.firebase.auth.FirebaseAuth
 import com.ayesha.guidechat.model.UserProfile
+import com.ayesha.guidechat.ui.ChatScreen
+import com.ayesha.guidechat.ui.HomeScreen
+import com.ayesha.guidechat.ui.UserSearchScreen
 import com.ayesha.guidechat.ui.theme.GuideChatTheme
+import com.google.firebase.auth.FirebaseAuth
 
 class MainActivity : ComponentActivity() {
 
@@ -62,160 +64,225 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             GuideChatTheme {
-
-                var currentScreen by remember {
-                    mutableStateOf("login")
-                }
-
-                var currentUserProfile by remember {
-                    mutableStateOf<UserProfile?>(null)
-                }
-
-                var profileLoading by remember {
-                    mutableStateOf(false)
-                }
-
-                var profileError by remember {
-                    mutableStateOf<String?>(null)
-                }
-
-                LaunchedEffect(currentScreen) {
-                    if (currentScreen == "home") {
-                        val uid = FirebaseAuth
-                            .getInstance()
-                            .currentUser
-                            ?.uid
-
-                        if (uid != null) {
-                            profileLoading = true
-                            profileError = null
-
-                            UserRepository().getUserProfile(
-                                uid = uid,
-                                onSuccess = { profile ->
-                                    currentUserProfile = profile
-                                    profileLoading = false
-                                },
-                                onError = { error ->
-                                    profileError = error
-                                    profileLoading = false
-                                }
-                            )
-                        } else {
-                            profileError = "No signed-in user found"
-                        }
-                    }
-                }
-
-                when (currentScreen) {
-
-                    "login" -> {
-                        LoginScreen(
-                            onLoginSuccess = {
-                                currentScreen = "home"
-                            },
-                            onCreateAccount = {
-                                currentScreen = "register"
-                            }
-                        )
-                    }
-
-                    "register" -> {
-                        RegisterScreen(
-                            onBackToLogin = {
-                                currentScreen = "login"
-                            }
-                        )
-                    }
-
-                    "home" -> {
-                        when {
-                            profileLoading -> {
-                                LoadingProfileScreen()
-                            }
-
-                            currentUserProfile != null -> {
-                                HomeScreen(
-                                    userName = currentUserProfile!!.name,
-                                    onChatClick = {
-                                        // Real Firestore chat search will be connected in Step 8B.
-                                    },
-                                    onNewChatClick = {
-                                        // Real Firestore user search will be connected in Step 8B.
-                                    }
-                                )
-                            }
-
-                            else -> {
-                                ProfileErrorScreen(
-                                    message = profileError ?: "Unable to load your profile",
-                                    onBackToLogin = {
-                                        currentScreen = "login"
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
+                GuideChatApp()
             }
         }
     }
 }
 
+/*
+ * GuideChat navigation:
+ *
+ * login
+ *   -> register
+ *   -> home
+ *   -> userSearch
+ *   -> chat
+ *
+ * The selected user is the real UserProfile loaded from Firestore.
+ */
 @Composable
-private fun LoadingProfileScreen() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = "Loading your profile...",
-            color = Color(0xFF2E6F40),
-            fontSize = 16.sp,
-            fontWeight = FontWeight.Medium
-        )
+fun GuideChatApp() {
+
+    var currentScreen by remember {
+        mutableStateOf("login")
     }
-}
 
-@Composable
-private fun ProfileErrorScreen(
-    message: String,
-    onBackToLogin: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(
-            text = "Could not load your profile",
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color(0xFF253D2C)
-        )
+    var currentUserProfile by remember {
+        mutableStateOf<UserProfile?>(null)
+    }
 
-        Spacer(modifier = Modifier.height(8.dp))
+    var selectedUser by remember {
+        mutableStateOf<UserProfile?>(null)
+    }
 
-        Text(
-            text = message,
-            color = Color.Gray,
-            textAlign = TextAlign.Center
-        )
+    val userRepository = remember {
+        UserRepository()
+    }
 
-        Spacer(modifier = Modifier.height(18.dp))
+    LaunchedEffect(currentScreen) {
 
-        Button(
-            onClick = onBackToLogin,
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFF2E6F40)
+        if (currentScreen == "home") {
+
+            val firebaseUser =
+                FirebaseAuth.getInstance().currentUser
+
+            if (firebaseUser != null) {
+
+                userRepository.getUserProfile(
+                    uid = firebaseUser.uid,
+
+                    onSuccess = { profile ->
+                        currentUserProfile = profile
+                    },
+
+                    onError = {
+                        // Keep the generic "User" fallback.
+                        // The user can still continue using the app.
+                    }
+                )
+            }
+        }
+    }
+
+    when (currentScreen) {
+
+        // =====================================================
+        // LOGIN
+        // =====================================================
+
+        "login" -> {
+
+            LoginScreen(
+                onLoginSuccess = {
+
+                    currentUserProfile = null
+                    selectedUser = null
+                    currentScreen = "home"
+                },
+
+                onCreateAccount = {
+
+                    currentScreen = "register"
+                }
             )
-        ) {
-            Text("Back to Sign In")
+        }
+
+        // =====================================================
+        // REGISTER
+        // =====================================================
+
+        "register" -> {
+
+            RegisterScreen(
+                onBackToLogin = {
+
+                    currentScreen = "login"
+                }
+            )
+        }
+
+        // =====================================================
+        // HOME
+        // =====================================================
+
+        "home" -> {
+
+            val displayName =
+                currentUserProfile
+                    ?.name
+                    ?.trim()
+                    ?.takeIf { it.isNotEmpty() }
+                    ?: "User"
+
+            HomeScreen(
+                userName = displayName,
+
+                onChatClick = { chat ->
+
+                    // Existing conversations will be connected
+                    // after the first Firestore message step.
+                },
+
+                onNewChatClick = {
+
+                    currentScreen = "userSearch"
+                },
+
+                onSearchClick = {
+
+                    currentScreen = "userSearch"
+                }
+            )
+        }
+
+        // =====================================================
+        // REAL FIRESTORE USER SEARCH
+        // =====================================================
+
+        "userSearch" -> {
+
+            val firebaseUser =
+                FirebaseAuth.getInstance().currentUser
+
+            if (firebaseUser != null) {
+
+                UserSearchScreen(
+
+                    currentUserId = firebaseUser.uid,
+
+                    onBack = {
+
+                        currentScreen = "home"
+                    },
+
+                    onUserSelected = { user ->
+
+                        selectedUser = user
+                        currentScreen = "chat"
+                    }
+                )
+
+            } else {
+
+                currentScreen = "login"
+            }
+        }
+
+        // =====================================================
+        // ONE-TO-ONE CHAT
+        // =====================================================
+
+        "chat" -> {
+
+            val firebaseUser =
+                FirebaseAuth.getInstance().currentUser
+
+            val otherUser = selectedUser
+
+            if (
+                firebaseUser != null &&
+                otherUser != null
+            ) {
+
+                ChatScreen(
+
+                    currentUserId = firebaseUser.uid,
+
+                    currentUserName =
+                        currentUserProfile
+                            ?.name
+                            ?.ifBlank { "User" }
+                            ?: "User",
+
+                    otherUser = otherUser,
+
+                    onBack = {
+
+                        currentScreen = "userSearch"
+                    }
+                )
+
+            } else {
+
+                currentScreen = "home"
+            }
+        }
+
+        // =====================================================
+        // FALLBACK
+        // =====================================================
+
+        else -> {
+
+            currentScreen = "login"
         }
     }
 }
+
+/* =========================================================
+   LOGIN SCREEN
+   ========================================================= */
 
 @Composable
 fun LoginScreen(
@@ -257,8 +324,7 @@ fun LoginScreen(
             verticalArrangement = Arrangement.Center
         ) {
 
-            /* ---------- LOGO ---------- */
-
+            // Logo
             Box(
                 modifier = Modifier
                     .size(82.dp)
@@ -269,12 +335,9 @@ fun LoginScreen(
             ) {
 
                 Text(
-                    text = "M",
-
+                    text = "G",
                     color = Color(0xFF2E6F40),
-
                     fontSize = 38.sp,
-
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -283,15 +346,10 @@ fun LoginScreen(
                 modifier = Modifier.height(18.dp)
             )
 
-            /* ---------- APP NAME ---------- */
-
             Text(
-                text = "MentorConnect",
-
+                text = "GuideChat",
                 fontSize = 30.sp,
-
                 fontWeight = FontWeight.Bold,
-
                 color = Color(0xFF253D2C)
             )
 
@@ -301,17 +359,13 @@ fun LoginScreen(
 
             Text(
                 text = "Connect • Collaborate • Grow",
-
                 fontSize = 14.sp,
-
                 color = Color(0xFF68BA7F)
             )
 
             Spacer(
                 modifier = Modifier.height(30.dp)
             )
-
-            /* ---------- LOGIN CARD ---------- */
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -333,11 +387,8 @@ fun LoginScreen(
 
                     Text(
                         text = "Welcome Back 👋",
-
                         fontSize = 22.sp,
-
                         fontWeight = FontWeight.Bold,
-
                         color = Color(0xFF253D2C)
                     )
 
@@ -347,17 +398,13 @@ fun LoginScreen(
 
                     Text(
                         text = "Sign in to continue your conversations",
-
                         fontSize = 14.sp,
-
                         color = Color(0xFF6B756E)
                     )
 
                     Spacer(
                         modifier = Modifier.height(22.dp)
                     )
-
-                    /* ---------- EMAIL ---------- */
 
                     OutlinedTextField(
                         value = email,
@@ -385,13 +432,9 @@ fun LoginScreen(
                         shape = RoundedCornerShape(14.dp),
 
                         colors = OutlinedTextFieldDefaults.colors(
-
                             focusedBorderColor = Color(0xFF2E6F40),
-
                             unfocusedBorderColor = Color(0xFFD5DED7),
-
                             focusedLabelColor = Color(0xFF2E6F40),
-
                             cursorColor = Color(0xFF2E6F40)
                         )
                     )
@@ -399,8 +442,6 @@ fun LoginScreen(
                     Spacer(
                         modifier = Modifier.height(14.dp)
                     )
-
-                    /* ---------- PASSWORD ---------- */
 
                     OutlinedTextField(
                         value = password,
@@ -459,13 +500,9 @@ fun LoginScreen(
                         shape = RoundedCornerShape(14.dp),
 
                         colors = OutlinedTextFieldDefaults.colors(
-
                             focusedBorderColor = Color(0xFF2E6F40),
-
                             unfocusedBorderColor = Color(0xFFD5DED7),
-
                             focusedLabelColor = Color(0xFF2E6F40),
-
                             cursorColor = Color(0xFF2E6F40)
                         )
                     )
@@ -473,8 +510,6 @@ fun LoginScreen(
                     Spacer(
                         modifier = Modifier.height(8.dp)
                     )
-
-                    /* ---------- FORGOT PASSWORD ---------- */
 
                     TextButton(
                         onClick = {
@@ -493,9 +528,7 @@ fun LoginScreen(
 
                         Text(
                             text = "Forgot password?",
-
                             color = Color(0xFF2E6F40),
-
                             fontSize = 13.sp
                         )
                     }
@@ -503,8 +536,6 @@ fun LoginScreen(
                     Spacer(
                         modifier = Modifier.height(8.dp)
                     )
-
-                    /* ---------- LOGIN BUTTON ---------- */
 
                     Button(
                         onClick = {
@@ -565,16 +596,13 @@ fun LoginScreen(
 
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFF2E6F40),
-
                             contentColor = Color.White
                         )
                     ) {
 
                         Text(
                             text = "SIGN IN",
-
                             fontSize = 15.sp,
-
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -583,10 +611,8 @@ fun LoginScreen(
                         modifier = Modifier.height(18.dp)
                     )
 
-                    /* ---------- CREATE ACCOUNT ---------- */
-
                     Text(
-                        text = "New to MentorConnect?",
+                        text = "New to GuideChat?",
 
                         modifier = Modifier.fillMaxWidth(),
 
@@ -640,7 +666,6 @@ fun LoginScreen(
 @Composable
 fun RegisterScreen(
     onBackToLogin: () -> Unit
-
 ) {
 
     val context = LocalContext.current
@@ -652,7 +677,6 @@ fun RegisterScreen(
     val userRepository = remember {
         UserRepository()
     }
-
 
     var name by remember {
         mutableStateOf("")
@@ -677,9 +701,11 @@ fun RegisterScreen(
     var selectedRole by remember {
         mutableStateOf("Intern")
     }
+
     var isCreatingAccount by remember {
         mutableStateOf(false)
     }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -696,8 +722,6 @@ fun RegisterScreen(
             verticalArrangement = Arrangement.Center
         ) {
 
-            /* ---------- LOGO ---------- */
-
             Box(
                 modifier = Modifier
                     .size(68.dp)
@@ -708,12 +732,9 @@ fun RegisterScreen(
             ) {
 
                 Text(
-                    text = "M",
-
+                    text = "G",
                     color = Color(0xFF2E6F40),
-
                     fontSize = 32.sp,
-
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -721,8 +742,6 @@ fun RegisterScreen(
             Spacer(
                 modifier = Modifier.height(14.dp)
             )
-
-            /* ---------- TITLE ---------- */
 
             Text(
                 text = "Create Account",
@@ -750,8 +769,6 @@ fun RegisterScreen(
                 modifier = Modifier.height(24.dp)
             )
 
-            /* ---------- REGISTER CARD ---------- */
-
             Card(
                 modifier = Modifier.fillMaxWidth(),
 
@@ -769,8 +786,6 @@ fun RegisterScreen(
                 Column(
                     modifier = Modifier.padding(22.dp)
                 ) {
-
-                    /* ---------- NAME ---------- */
 
                     OutlinedTextField(
                         value = name,
@@ -794,13 +809,9 @@ fun RegisterScreen(
                         shape = RoundedCornerShape(14.dp),
 
                         colors = OutlinedTextFieldDefaults.colors(
-
                             focusedBorderColor = Color(0xFF2E6F40),
-
                             unfocusedBorderColor = Color(0xFFD5DED7),
-
                             focusedLabelColor = Color(0xFF2E6F40),
-
                             cursorColor = Color(0xFF2E6F40)
                         )
                     )
@@ -808,8 +819,6 @@ fun RegisterScreen(
                     Spacer(
                         modifier = Modifier.height(13.dp)
                     )
-
-                    /* ---------- EMAIL ---------- */
 
                     OutlinedTextField(
                         value = email,
@@ -837,13 +846,9 @@ fun RegisterScreen(
                         shape = RoundedCornerShape(14.dp),
 
                         colors = OutlinedTextFieldDefaults.colors(
-
                             focusedBorderColor = Color(0xFF2E6F40),
-
                             unfocusedBorderColor = Color(0xFFD5DED7),
-
                             focusedLabelColor = Color(0xFF2E6F40),
-
                             cursorColor = Color(0xFF2E6F40)
                         )
                     )
@@ -851,8 +856,6 @@ fun RegisterScreen(
                     Spacer(
                         modifier = Modifier.height(13.dp)
                     )
-
-                    /* ---------- PASSWORD ---------- */
 
                     OutlinedTextField(
                         value = password,
@@ -909,13 +912,9 @@ fun RegisterScreen(
                         shape = RoundedCornerShape(14.dp),
 
                         colors = OutlinedTextFieldDefaults.colors(
-
                             focusedBorderColor = Color(0xFF2E6F40),
-
                             unfocusedBorderColor = Color(0xFFD5DED7),
-
                             focusedLabelColor = Color(0xFF2E6F40),
-
                             cursorColor = Color(0xFF2E6F40)
                         )
                     )
@@ -923,8 +922,6 @@ fun RegisterScreen(
                     Spacer(
                         modifier = Modifier.height(13.dp)
                     )
-
-                    /* ---------- CONFIRM PASSWORD ---------- */
 
                     OutlinedTextField(
                         value = confirmPassword,
@@ -955,13 +952,9 @@ fun RegisterScreen(
                         shape = RoundedCornerShape(14.dp),
 
                         colors = OutlinedTextFieldDefaults.colors(
-
                             focusedBorderColor = Color(0xFF2E6F40),
-
                             unfocusedBorderColor = Color(0xFFD5DED7),
-
                             focusedLabelColor = Color(0xFF2E6F40),
-
                             cursorColor = Color(0xFF2E6F40)
                         )
                     )
@@ -969,8 +962,6 @@ fun RegisterScreen(
                     Spacer(
                         modifier = Modifier.height(18.dp)
                     )
-
-                    /* ---------- ROLE ---------- */
 
                     Text(
                         text = "I am a...",
@@ -1011,7 +1002,6 @@ fun RegisterScreen(
 
                             Text(
                                 text = "Intern",
-
                                 color = Color(0xFF253D2C)
                             )
                         }
@@ -1034,7 +1024,6 @@ fun RegisterScreen(
 
                             Text(
                                 text = "Mentor",
-
                                 color = Color(0xFF253D2C)
                             )
                         }
@@ -1044,17 +1033,12 @@ fun RegisterScreen(
                         modifier = Modifier.height(14.dp)
                     )
 
-                    /* ---------- CREATE ACCOUNT ---------- */
-
                     Button(
                         onClick = {
 
-                            // Prevent multiple clicks
                             if (isCreatingAccount) {
                                 return@Button
                             }
-
-                            // ---------- VALIDATION ----------
 
                             when {
 
@@ -1065,7 +1049,6 @@ fun RegisterScreen(
                                         "Please enter your name",
                                         Toast.LENGTH_SHORT
                                     ).show()
-
                                 }
 
                                 email.isBlank() -> {
@@ -1075,7 +1058,6 @@ fun RegisterScreen(
                                         "Please enter your email",
                                         Toast.LENGTH_SHORT
                                     ).show()
-
                                 }
 
                                 password.length < 6 -> {
@@ -1085,7 +1067,6 @@ fun RegisterScreen(
                                         "Password must be at least 6 characters",
                                         Toast.LENGTH_SHORT
                                     ).show()
-
                                 }
 
                                 password != confirmPassword -> {
@@ -1095,12 +1076,10 @@ fun RegisterScreen(
                                         "Passwords do not match",
                                         Toast.LENGTH_SHORT
                                     ).show()
-
                                 }
 
                                 else -> {
 
-                                    // Start registration
                                     isCreatingAccount = true
 
                                     authRepository.register(
@@ -1108,77 +1087,87 @@ fun RegisterScreen(
                                         password = password
                                     ) { success, error ->
 
-                                        if (success) {
+                                        if (!success) {
 
-                                            // Firebase Authentication succeeded
-                                            val firebaseUser =
-                                                authRepository.getCurrentUser()
-
-                                            if (firebaseUser != null) {
-
-                                                val userProfile = UserProfile(
-                                                    uid = firebaseUser.uid,
-                                                    name = name.trim(),
-                                                    email = email.trim(),
-                                                    role = selectedRole.lowercase(),
-                                                    profileImage = "",
-                                                    isOnline = false,
-                                                    createdAt = System.currentTimeMillis()
-                                                )
-
-                                                // Create Firestore profile
-                                                userRepository.createUserProfile(
-                                                    userProfile
-                                                ) { profileCreated, profileError ->
-
-                                                    if (profileCreated) {
-
-                                                        // EVERYTHING succeeded
-                                                        isCreatingAccount = false
-
-                                                        Toast.makeText(
-                                                            context,
-                                                            "Account created successfully!",
-                                                            Toast.LENGTH_SHORT
-                                                        ).show()
-
-                                                        onBackToLogin()
-
-                                                    } else {
-
-                                                        // Auth succeeded but Firestore failed
-                                                        isCreatingAccount = false
-
-                                                        Toast.makeText(
-                                                            context,
-                                                            "Account created, but profile setup failed. Please try again.",
-                                                            Toast.LENGTH_LONG
-                                                        ).show()
-                                                    }
-                                                }
-
-                                            } else {
-
-                                                isCreatingAccount = false
-
-                                                Toast.makeText(
-                                                    context,
-                                                    "Account created, but user information was unavailable.",
-                                                    Toast.LENGTH_LONG
-                                                ).show()
-                                            }
-
-                                        } else {
-
-                                            // Firebase Authentication failed
                                             isCreatingAccount = false
 
                                             Toast.makeText(
                                                 context,
-                                                error ?: "Registration failed",
+                                                error
+                                                    ?: "Registration failed",
                                                 Toast.LENGTH_LONG
                                             ).show()
+
+                                            return@register
                                         }
+
+                                        val firebaseUser =
+                                            authRepository
+                                                .getCurrentUser()
+
+                                        if (firebaseUser == null) {
+
+                                            isCreatingAccount = false
+
+                                            Toast.makeText(
+                                                context,
+                                                "Account created but user information was unavailable",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+
+                                            return@register
+                                        }
+
+                                        val userProfile =
+                                            UserProfile(
+
+                                                uid =
+                                                    firebaseUser.uid,
+
+                                                name =
+                                                    name.trim(),
+
+                                                email =
+                                                    email.trim(),
+
+                                                role =
+                                                    selectedRole.lowercase(),
+
+                                                profileImage = "",
+
+                                                isOnline = false,
+
+                                                createdAt =
+                                                    System.currentTimeMillis()
+                                            )
+
+                                        userRepository
+                                            .createUserProfile(
+                                                userProfile
+                                            ) { profileCreated, profileError ->
+
+                                                isCreatingAccount = false
+
+                                                if (profileCreated) {
+
+                                                    Toast.makeText(
+                                                        context,
+                                                        "Account created successfully!",
+                                                        Toast.LENGTH_SHORT
+                                                    ).show()
+
+                                                    onBackToLogin()
+
+                                                } else {
+
+                                                    Toast.makeText(
+                                                        context,
+                                                        profileError
+                                                            ?: "Account created but profile failed",
+                                                        Toast.LENGTH_LONG
+                                                    ).show()
+                                                }
+                                            }
                                     }
                                 }
                             }
@@ -1195,17 +1184,18 @@ fun RegisterScreen(
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFF2E6F40),
                             contentColor = Color.White,
-                            disabledContainerColor = Color(0xFF68BA7F),
-                            disabledContentColor = Color.White
+                            disabledContainerColor =
+                                Color(0xFF9BBBA4)
                         )
                     ) {
 
                         Text(
-                            text = if (isCreatingAccount) {
-                                "CREATING ACCOUNT..."
-                            } else {
-                                "CREATE ACCOUNT"
-                            },
+                            text =
+                                if (isCreatingAccount) {
+                                    "CREATING..."
+                                } else {
+                                    "CREATE ACCOUNT"
+                                },
 
                             fontSize = 14.sp,
 
@@ -1213,12 +1203,9 @@ fun RegisterScreen(
                         )
                     }
 
-
                     Spacer(
                         modifier = Modifier.height(8.dp)
                     )
-
-                    /* ---------- BACK TO LOGIN ---------- */
 
                     TextButton(
                         onClick = onBackToLogin,
@@ -1229,7 +1216,8 @@ fun RegisterScreen(
                     ) {
 
                         Text(
-                            text = "Already have an account? Sign in",
+                            text =
+                                "Already have an account? Sign in",
 
                             color = Color(0xFF2E6F40),
 
