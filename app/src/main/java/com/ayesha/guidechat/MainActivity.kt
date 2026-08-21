@@ -1,5 +1,6 @@
 package com.ayesha.guidechat
 
+
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -46,6 +47,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ayesha.guidechat.data.AuthRepository
+import com.ayesha.guidechat.data.UserRepository
+import com.ayesha.guidechat.model.UserProfile
 import com.ayesha.guidechat.ui.theme.GuideChatTheme
 
 class MainActivity : ComponentActivity() {
@@ -101,6 +104,10 @@ fun LoginScreen(
 
     val authRepository = remember {
         AuthRepository()
+    }
+
+    val userRepository = remember {
+        UserRepository()
     }
 
     var email by remember {
@@ -418,7 +425,7 @@ fun LoginScreen(
                                         Toast.LENGTH_SHORT
                                     ).show()
 
-                                    // Home screen will be added next.
+
 
                                 } else {
 
@@ -522,6 +529,11 @@ fun RegisterScreen(
         AuthRepository()
     }
 
+    val userRepository = remember {
+        UserRepository()
+    }
+
+
     var name by remember {
         mutableStateOf("")
     }
@@ -545,7 +557,9 @@ fun RegisterScreen(
     var selectedRole by remember {
         mutableStateOf("Intern")
     }
-
+    var isCreatingAccount by remember {
+        mutableStateOf(false)
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -915,6 +929,13 @@ fun RegisterScreen(
                     Button(
                         onClick = {
 
+                            // Prevent multiple clicks
+                            if (isCreatingAccount) {
+                                return@Button
+                            }
+
+                            // ---------- VALIDATION ----------
+
                             when {
 
                                 name.isBlank() -> {
@@ -924,6 +945,7 @@ fun RegisterScreen(
                                         "Please enter your name",
                                         Toast.LENGTH_SHORT
                                     ).show()
+
                                 }
 
                                 email.isBlank() -> {
@@ -933,6 +955,7 @@ fun RegisterScreen(
                                         "Please enter your email",
                                         Toast.LENGTH_SHORT
                                     ).show()
+
                                 }
 
                                 password.length < 6 -> {
@@ -942,6 +965,7 @@ fun RegisterScreen(
                                         "Password must be at least 6 characters",
                                         Toast.LENGTH_SHORT
                                     ).show()
+
                                 }
 
                                 password != confirmPassword -> {
@@ -951,9 +975,13 @@ fun RegisterScreen(
                                         "Passwords do not match",
                                         Toast.LENGTH_SHORT
                                     ).show()
+
                                 }
 
                                 else -> {
+
+                                    // Start registration
+                                    isCreatingAccount = true
 
                                     authRepository.register(
                                         email = email.trim(),
@@ -962,20 +990,72 @@ fun RegisterScreen(
 
                                         if (success) {
 
-                                            Toast.makeText(
-                                                context,
-                                                "Account created successfully!",
-                                                Toast.LENGTH_SHORT
-                                            ).show()
+                                            // Firebase Authentication succeeded
+                                            val firebaseUser =
+                                                authRepository.getCurrentUser()
 
-                                            onBackToLogin()
+                                            if (firebaseUser != null) {
+
+                                                val userProfile = UserProfile(
+                                                    uid = firebaseUser.uid,
+                                                    name = name.trim(),
+                                                    email = email.trim(),
+                                                    role = selectedRole.lowercase(),
+                                                    profileImage = "",
+                                                    isOnline = false,
+                                                    createdAt = System.currentTimeMillis()
+                                                )
+
+                                                // Create Firestore profile
+                                                userRepository.createUserProfile(
+                                                    userProfile
+                                                ) { profileCreated, profileError ->
+
+                                                    if (profileCreated) {
+
+                                                        // EVERYTHING succeeded
+                                                        isCreatingAccount = false
+
+                                                        Toast.makeText(
+                                                            context,
+                                                            "Account created successfully!",
+                                                            Toast.LENGTH_SHORT
+                                                        ).show()
+
+                                                        onBackToLogin()
+
+                                                    } else {
+
+                                                        // Auth succeeded but Firestore failed
+                                                        isCreatingAccount = false
+
+                                                        Toast.makeText(
+                                                            context,
+                                                            "Account created, but profile setup failed. Please try again.",
+                                                            Toast.LENGTH_LONG
+                                                        ).show()
+                                                    }
+                                                }
+
+                                            } else {
+
+                                                isCreatingAccount = false
+
+                                                Toast.makeText(
+                                                    context,
+                                                    "Account created, but user information was unavailable.",
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                            }
 
                                         } else {
 
+                                            // Firebase Authentication failed
+                                            isCreatingAccount = false
+
                                             Toast.makeText(
                                                 context,
-                                                error
-                                                    ?: "Registration failed",
+                                                error ?: "Registration failed",
                                                 Toast.LENGTH_LONG
                                             ).show()
                                         }
@@ -983,6 +1063,8 @@ fun RegisterScreen(
                                 }
                             }
                         },
+
+                        enabled = !isCreatingAccount,
 
                         modifier = Modifier
                             .fillMaxWidth()
@@ -992,19 +1074,25 @@ fun RegisterScreen(
 
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color(0xFF2E6F40),
-
-                            contentColor = Color.White
+                            contentColor = Color.White,
+                            disabledContainerColor = Color(0xFF68BA7F),
+                            disabledContentColor = Color.White
                         )
                     ) {
 
                         Text(
-                            text = "CREATE ACCOUNT",
+                            text = if (isCreatingAccount) {
+                                "CREATING ACCOUNT..."
+                            } else {
+                                "CREATE ACCOUNT"
+                            },
 
                             fontSize = 14.sp,
 
                             fontWeight = FontWeight.Bold
                         )
                     }
+
 
                     Spacer(
                         modifier = Modifier.height(8.dp)
@@ -1020,7 +1108,7 @@ fun RegisterScreen(
                         )
                     ) {
 
-           git status             Text(
+                    Text(
                             text = "Already have an account? Sign in",
 
                             color = Color(0xFF2E6F40),

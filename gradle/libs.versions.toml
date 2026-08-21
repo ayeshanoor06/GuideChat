@@ -40,6 +40,8 @@ firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.r
 
 firebase-auth = { group = "com.google.firebase", name = "firebase-auth" }
 
+firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore" }
+
 
 androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 
