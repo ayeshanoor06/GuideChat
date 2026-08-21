@@ -13,16 +13,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -43,7 +42,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -54,6 +52,7 @@ private val DarkText = Color(0xFF253D2C)
 private val Background = Color(0xFFF7FAF7)
 
 data class ChatPreview(
+    val userId: String = "",
     val name: String,
     val message: String,
     val time: String,
@@ -64,7 +63,7 @@ data class ChatPreview(
 
 @Composable
 fun HomeScreen(
-    userName: String = "Ayesha",
+    userName: String,
     onChatClick: (ChatPreview) -> Unit = {},
     onNewChatClick: () -> Unit = {}
 ) {
@@ -77,46 +76,11 @@ fun HomeScreen(
         mutableIntStateOf(0)
     }
 
-    val conversations = remember {
-        listOf(
-            ChatPreview(
-                name = "Sarah Khan",
-                message = "See you tomorrow!",
-                time = "10:42 AM",
-                unreadCount = 2,
-                isOnline = true
-            ),
-            ChatPreview(
-                name = "Ali Ahmed",
-                message = "Thanks for the help!",
-                time = "09:31 AM",
-                isOnline = true
-            ),
-            ChatPreview(
-                name = "Development Team",
-                message = "Meeting at 3 PM",
-                time = "08:45 AM",
-                unreadCount = 4,
-                isGroup = true
-            ),
-            ChatPreview(
-                name = "Hassan Raza",
-                message = "I've sent the documents.",
-                time = "Yesterday",
-                isOnline = false
-            ),
-            ChatPreview(
-                name = "UI/UX Mentors",
-                message = "New resources available",
-                time = "Yesterday",
-                isGroup = true,
-                unreadCount = 1
-            )
-        )
-    }
+    // There are intentionally no hardcoded users here.
+    // Real conversations will be loaded from Firestore in the next step.
+    val conversations = emptyList<ChatPreview>()
 
     val filteredConversations = conversations.filter { chat ->
-
         chat.name.contains(
             searchText,
             ignoreCase = true
@@ -127,11 +91,9 @@ fun HomeScreen(
         containerColor = Background,
 
         bottomBar = {
-
             NavigationBar(
                 containerColor = Color.White
             ) {
-
                 NavigationBarItem(
                     selected = selectedBottomItem == 0,
                     onClick = {
@@ -183,13 +145,11 @@ fun HomeScreen(
         },
 
         floatingActionButton = {
-
             FloatingActionButton(
                 onClick = onNewChatClick,
                 containerColor = DarkGreen,
                 contentColor = Color.White
             ) {
-
                 Icon(
                     imageVector = Icons.Default.Add,
                     contentDescription = "New chat"
@@ -210,16 +170,12 @@ fun HomeScreen(
                 modifier = Modifier.height(24.dp)
             )
 
-            // Header
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-
                 Column {
-
                     Text(
                         text = "Good morning 👋",
                         fontSize = 14.sp,
@@ -245,12 +201,11 @@ fun HomeScreen(
                         .background(LightMint),
                     contentAlignment = Alignment.Center
                 ) {
-
                     Text(
                         text = userName
                             .firstOrNull()
                             ?.uppercase()
-                            ?: "A",
+                            ?: "?",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = DarkGreen
@@ -262,41 +217,29 @@ fun HomeScreen(
                 modifier = Modifier.height(22.dp)
             )
 
-            // Search
-
             TextField(
                 value = searchText,
                 onValueChange = {
                     searchText = it
                 },
-
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(54.dp),
-
                 placeholder = {
-                    Text(
-                        text = "Search conversations..."
-                    )
+                    Text("Search conversations...")
                 },
-
                 leadingIcon = {
-
                     Icon(
                         imageVector = Icons.Default.Search,
                         contentDescription = "Search"
                     )
                 },
-
                 singleLine = true,
-
                 shape = RoundedCornerShape(16.dp),
-
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.White,
                     unfocusedContainerColor = Color.White,
                     disabledContainerColor = Color.White,
-
                     focusedIndicatorColor = Color.Transparent,
                     unfocusedIndicatorColor = Color.Transparent
                 )
@@ -306,14 +249,11 @@ fun HomeScreen(
                 modifier = Modifier.height(26.dp)
             )
 
-            // Messages header
-
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-
                 Text(
                     text = "Messages",
                     fontSize = 21.sp,
@@ -324,7 +264,6 @@ fun HomeScreen(
                 IconButton(
                     onClick = {}
                 ) {
-
                     Icon(
                         imageVector = Icons.Default.MoreVert,
                         contentDescription = "More options",
@@ -337,21 +276,63 @@ fun HomeScreen(
                 modifier = Modifier.height(8.dp)
             )
 
-            // Chat list
+            if (filteredConversations.isEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 70.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(76.dp)
+                            .clip(CircleShape)
+                            .background(LightMint),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ChatBubble,
+                            contentDescription = null,
+                            tint = DarkGreen,
+                            modifier = Modifier.size(34.dp)
+                        )
+                    }
 
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-
-                items(filteredConversations) { chat ->
-
-                    ChatListItem(
-                        chat = chat,
-                        onClick = {
-                            onChatClick(chat)
-                        }
+                    Spacer(
+                        modifier = Modifier.height(16.dp)
                     )
+
+                    Text(
+                        text = "No conversations yet",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = DarkText
+                    )
+
+                    Spacer(
+                        modifier = Modifier.height(6.dp)
+                    )
+
+                    Text(
+                        text = "Start a conversation with an intern or mentor.",
+                        fontSize = 13.sp,
+                        color = Color.Gray
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(filteredConversations.size) { index ->
+                        val chat = filteredConversations[index]
+                        ChatListItem(
+                            chat = chat,
+                            onClick = {
+                                onChatClick(chat)
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -363,24 +344,17 @@ private fun ChatListItem(
     chat: ChatPreview,
     onClick: () -> Unit
 ) {
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(
-                RoundedCornerShape(18.dp)
-            )
+            .clip(RoundedCornerShape(18.dp))
             .background(Color.White)
             .clickable {
                 onClick()
             }
             .padding(14.dp),
-
         verticalAlignment = Alignment.CenterVertically
     ) {
-
-        // Avatar
-
         Box(
             modifier = Modifier
                 .size(54.dp)
@@ -392,42 +366,23 @@ private fun ChatListItem(
                         Color(0xFFE8F4EA)
                     }
                 ),
-
             contentAlignment = Alignment.Center
         ) {
-
             if (chat.isGroup) {
-
                 Icon(
                     imageVector = Icons.Default.Groups,
                     contentDescription = "Group",
                     tint = DarkGreen
                 )
-
             } else {
-
                 Text(
                     text = chat.name
                         .firstOrNull()
                         ?.uppercase()
                         ?: "?",
-
                     fontSize = 18.sp,
-
                     fontWeight = FontWeight.Bold,
-
                     color = DarkGreen
-                )
-            }
-
-            if (chat.isOnline && !chat.isGroup) {
-
-                Box(
-                    modifier = Modifier
-                        .size(12.dp)
-                        .clip(CircleShape)
-                        .background(MediumGreen)
-                        .align(Alignment.BottomEnd)
                 )
             }
         }
@@ -436,19 +391,14 @@ private fun ChatListItem(
             modifier = Modifier.size(13.dp)
         )
 
-        // Chat information
-
         Column(
             modifier = Modifier.weight(1f)
         ) {
-
             Text(
                 text = chat.name,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = DarkText,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                color = DarkText
             )
 
             Spacer(
@@ -458,51 +408,14 @@ private fun ChatListItem(
             Text(
                 text = chat.message,
                 fontSize = 13.sp,
-                color = Color.Gray,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-
-        Spacer(
-            modifier = Modifier.size(8.dp)
-        )
-
-        // Time + unread count
-
-        Column(
-            horizontalAlignment = Alignment.End
-        ) {
-
-            Text(
-                text = chat.time,
-                fontSize = 11.sp,
                 color = Color.Gray
             )
-
-            if (chat.unreadCount > 0) {
-
-                Spacer(
-                    modifier = Modifier.height(6.dp)
-                )
-
-                Box(
-                    modifier = Modifier
-                        .size(22.dp)
-                        .clip(CircleShape)
-                        .background(DarkGreen),
-
-                    contentAlignment = Alignment.Center
-                ) {
-
-                    Text(
-                        text = chat.unreadCount.toString(),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                }
-            }
         }
+
+        Text(
+            text = chat.time,
+            fontSize = 11.sp,
+            color = Color.Gray
+        )
     }
 }

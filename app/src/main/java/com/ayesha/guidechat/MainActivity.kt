@@ -30,6 +30,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ayesha.guidechat.data.AuthRepository
 import com.ayesha.guidechat.data.UserRepository
+import com.google.firebase.auth.FirebaseAuth
 import com.ayesha.guidechat.model.UserProfile
 import com.ayesha.guidechat.ui.theme.GuideChatTheme
 
@@ -59,17 +61,55 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         setContent {
-
             GuideChatTheme {
 
                 var currentScreen by remember {
                     mutableStateOf("login")
                 }
 
+                var currentUserProfile by remember {
+                    mutableStateOf<UserProfile?>(null)
+                }
+
+                var profileLoading by remember {
+                    mutableStateOf(false)
+                }
+
+                var profileError by remember {
+                    mutableStateOf<String?>(null)
+                }
+
+                LaunchedEffect(currentScreen) {
+                    if (currentScreen == "home") {
+                        val uid = FirebaseAuth
+                            .getInstance()
+                            .currentUser
+                            ?.uid
+
+                        if (uid != null) {
+                            profileLoading = true
+                            profileError = null
+
+                            UserRepository().getUserProfile(
+                                uid = uid,
+                                onSuccess = { profile ->
+                                    currentUserProfile = profile
+                                    profileLoading = false
+                                },
+                                onError = { error ->
+                                    profileError = error
+                                    profileLoading = false
+                                }
+                            )
+                        } else {
+                            profileError = "No signed-in user found"
+                        }
+                    }
+                }
+
                 when (currentScreen) {
 
                     "login" -> {
-
                         LoginScreen(
                             onLoginSuccess = {
                                 currentScreen = "home"
@@ -81,7 +121,6 @@ class MainActivity : ComponentActivity() {
                     }
 
                     "register" -> {
-
                         RegisterScreen(
                             onBackToLogin = {
                                 currentScreen = "login"
@@ -90,10 +129,32 @@ class MainActivity : ComponentActivity() {
                     }
 
                     "home" -> {
+                        when {
+                            profileLoading -> {
+                                LoadingProfileScreen()
+                            }
 
-                        HomeScreen(
-                            userName = "Ayesha"
-                        )
+                            currentUserProfile != null -> {
+                                HomeScreen(
+                                    userName = currentUserProfile!!.name,
+                                    onChatClick = {
+                                        // Real Firestore chat search will be connected in Step 8B.
+                                    },
+                                    onNewChatClick = {
+                                        // Real Firestore user search will be connected in Step 8B.
+                                    }
+                                )
+                            }
+
+                            else -> {
+                                ProfileErrorScreen(
+                                    message = profileError ?: "Unable to load your profile",
+                                    onBackToLogin = {
+                                        currentScreen = "login"
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -101,10 +162,60 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@Composable
+private fun LoadingProfileScreen() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "Loading your profile...",
+            color = Color(0xFF2E6F40),
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Medium
+        )
+    }
+}
 
-/* =========================================================
-   LOGIN SCREEN
-   ========================================================= */
+@Composable
+private fun ProfileErrorScreen(
+    message: String,
+    onBackToLogin: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "Could not load your profile",
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Bold,
+            color = Color(0xFF253D2C)
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = message,
+            color = Color.Gray,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(18.dp))
+
+        Button(
+            onClick = onBackToLogin,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color(0xFF2E6F40)
+            )
+        ) {
+            Text("Back to Sign In")
+        }
+    }
+}
 
 @Composable
 fun LoginScreen(
@@ -116,10 +227,6 @@ fun LoginScreen(
 
     val authRepository = remember {
         AuthRepository()
-    }
-
-    val userRepository = remember {
-        UserRepository()
     }
 
     var email by remember {

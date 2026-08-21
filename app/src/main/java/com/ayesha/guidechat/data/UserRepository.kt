@@ -5,65 +5,50 @@ import com.google.firebase.firestore.FirebaseFirestore
 
 class UserRepository {
 
-    private val firestore = FirebaseFirestore.getInstance()
-
-    private val usersCollection =
-        firestore.collection("users")
+    private val db = FirebaseFirestore.getInstance()
 
     fun createUserProfile(
         userProfile: UserProfile,
-        onResult: (Boolean, String?) -> Unit
+        onComplete: (Boolean, String?) -> Unit
     ) {
-
-        usersCollection
+        db.collection("users")
             .document(userProfile.uid)
             .set(userProfile)
             .addOnSuccessListener {
-
-                onResult(true, null)
-
+                onComplete(true, null)
             }
             .addOnFailureListener { exception ->
-
-                onResult(
+                onComplete(
                     false,
-                    exception.message
-                        ?: "Failed to create user profile"
+                    exception.message ?: "Unable to create user profile"
                 )
             }
     }
 
     fun getUserProfile(
         uid: String,
-        onResult: (UserProfile?, String?) -> Unit
+        onSuccess: (UserProfile) -> Unit,
+        onError: (String) -> Unit
     ) {
-
-        usersCollection
+        db.collection("users")
             .document(uid)
             .get()
             .addOnSuccessListener { document ->
-
                 if (document.exists()) {
+                    val profile = document.toObject(UserProfile::class.java)
 
-                    val profile =
-                        document.toObject(UserProfile::class.java)
-
-                    onResult(profile, null)
-
+                    if (profile != null) {
+                        onSuccess(profile.copy(uid = uid))
+                    } else {
+                        onError("User profile data is invalid")
+                    }
                 } else {
-
-                    onResult(
-                        null,
-                        "User profile not found"
-                    )
+                    onError("User profile not found")
                 }
             }
             .addOnFailureListener { exception ->
-
-                onResult(
-                    null,
-                    exception.message
-                        ?: "Failed to load profile"
+                onError(
+                    exception.message ?: "Unable to load user profile"
                 )
             }
     }
