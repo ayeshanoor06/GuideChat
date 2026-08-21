@@ -1,6 +1,6 @@
 package com.ayesha.guidechat
 
-
+import com.ayesha.guidechat.ui.HomeScreen
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -59,37 +59,48 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         setContent {
+
             GuideChatTheme {
-                MentorConnectApp()
+
+                var currentScreen by remember {
+                    mutableStateOf("login")
+                }
+
+                when (currentScreen) {
+
+                    "login" -> {
+
+                        LoginScreen(
+                            onLoginSuccess = {
+                                currentScreen = "home"
+                            },
+                            onCreateAccount = {
+                                currentScreen = "register"
+                            }
+                        )
+                    }
+
+                    "register" -> {
+
+                        RegisterScreen(
+                            onBackToLogin = {
+                                currentScreen = "login"
+                            }
+                        )
+                    }
+
+                    "home" -> {
+
+                        HomeScreen(
+                            userName = "Ayesha"
+                        )
+                    }
+                }
             }
         }
     }
 }
 
-@Composable
-fun MentorConnectApp() {
-
-    var showRegisterScreen by remember {
-        mutableStateOf(false)
-    }
-
-    if (showRegisterScreen) {
-
-        RegisterScreen(
-            onBackToLogin = {
-                showRegisterScreen = false
-            }
-        )
-
-    } else {
-
-        LoginScreen(
-            onCreateAccount = {
-                showRegisterScreen = true
-            }
-        )
-    }
-}
 
 /* =========================================================
    LOGIN SCREEN
@@ -97,6 +108,7 @@ fun MentorConnectApp() {
 
 @Composable
 fun LoginScreen(
+    onLoginSuccess: () -> Unit,
     onCreateAccount: () -> Unit
 ) {
 
@@ -425,7 +437,7 @@ fun LoginScreen(
                                         Toast.LENGTH_SHORT
                                     ).show()
 
-
+                                    onLoginSuccess()
 
                                 } else {
 
@@ -521,6 +533,7 @@ fun LoginScreen(
 @Composable
 fun RegisterScreen(
     onBackToLogin: () -> Unit
+
 ) {
 
     val context = LocalContext.current
@@ -1108,7 +1121,7 @@ fun RegisterScreen(
                         )
                     ) {
 
-                    Text(
+                        Text(
                             text = "Already have an account? Sign in",
 
                             color = Color(0xFF2E6F40),
