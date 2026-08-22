@@ -72,8 +72,10 @@ fun HomeScreen(
     conversationError: String? = null,
     onChatClick: (ChatPreview) -> Unit = {},
     onNewChatClick: () -> Unit = {},
-    onSearchClick: () -> Unit = {}
+    onSearchClick: () -> Unit = {},
+    onGroupsClick: () -> Unit = {}
 ) {
+
     var searchText by remember {
         mutableStateOf("")
     }
@@ -94,56 +96,94 @@ fun HomeScreen(
         containerColor = Background,
 
         bottomBar = {
+
             NavigationBar(
                 containerColor = Color.White
             ) {
 
+                // =================================================
+                // CHATS TAB
+                // =================================================
+
                 NavigationBarItem(
                     selected = selectedBottomItem == 0,
+
                     onClick = {
                         selectedBottomItem = 0
                     },
+
                     icon = {
+
                         Icon(
-                            imageVector = Icons.Default.ChatBubble,
+                            imageVector =
+                                Icons.Default.ChatBubble,
+
                             contentDescription = "Chats",
+
                             tint = DarkText
                         )
                     },
+
                     label = {
                         Text("Chats")
                     }
                 )
 
+                // =================================================
+                // GROUPS TAB
+                // =================================================
+
                 NavigationBarItem(
                     selected = selectedBottomItem == 1,
+
                     onClick = {
+
                         selectedBottomItem = 1
+
+                        // Open the real Groups screen
+                        onGroupsClick()
                     },
+
                     icon = {
+
                         Icon(
-                            imageVector = Icons.Default.Groups,
+                            imageVector =
+                                Icons.Default.Groups,
+
                             contentDescription = "Groups",
+
                             tint = DarkText
                         )
                     },
+
                     label = {
                         Text("Groups")
                     }
                 )
 
+                // =================================================
+                // PROFILE TAB
+                // =================================================
+
                 NavigationBarItem(
                     selected = selectedBottomItem == 2,
+
                     onClick = {
                         selectedBottomItem = 2
                     },
+
                     icon = {
+
                         Icon(
-                            imageVector = Icons.Default.Person,
+                            imageVector =
+                                Icons.Default.Person,
+
                             contentDescription = "Profile",
+
                             tint = DarkText
                         )
                     },
+
                     label = {
                         Text("Me")
                     }
@@ -151,15 +191,28 @@ fun HomeScreen(
             }
         },
 
+        // =====================================================
+        // NEW CHAT BUTTON
+        // =====================================================
+
         floatingActionButton = {
+
             FloatingActionButton(
+
                 onClick = onNewChatClick,
+
                 containerColor = DarkGreen,
+
                 contentColor = Color.White
+
             ) {
+
                 Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "New chat"
+                    imageVector =
+                        Icons.Default.Add,
+
+                    contentDescription =
+                        "New chat"
                 )
             }
         }
@@ -183,15 +236,21 @@ fun HomeScreen(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+
+                verticalAlignment =
+                    Alignment.CenterVertically,
+
+                horizontalArrangement =
+                    Arrangement.SpaceBetween
             ) {
 
                 Column {
 
                     Text(
                         text = "Good morning 👋",
+
                         fontSize = 14.sp,
+
                         color = Color.Gray
                     )
 
@@ -201,8 +260,11 @@ fun HomeScreen(
 
                     Text(
                         text = userName,
+
                         fontSize = 27.sp,
+
                         fontWeight = FontWeight.Bold,
+
                         color = DarkText
                     )
                 }
@@ -213,7 +275,8 @@ fun HomeScreen(
                         .clip(CircleShape)
                         .background(LightMint),
 
-                    contentAlignment = Alignment.Center
+                    contentAlignment =
+                        Alignment.Center
                 ) {
 
                     Text(
@@ -223,7 +286,10 @@ fun HomeScreen(
                             ?: "U",
 
                         fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold,
+
+                        fontWeight =
+                            FontWeight.Bold,
+
                         color = DarkGreen
                     )
                 }
@@ -238,6 +304,7 @@ fun HomeScreen(
             // =================================================
 
             TextField(
+
                 value = searchText,
 
                 onValueChange = {
@@ -249,28 +316,47 @@ fun HomeScreen(
                     .height(54.dp),
 
                 placeholder = {
-                    Text("Search conversations...")
+                    Text(
+                        "Search conversations..."
+                    )
                 },
 
                 leadingIcon = {
+
                     Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = "Search",
+                        imageVector =
+                            Icons.Default.Search,
+
+                        contentDescription =
+                            "Search",
+
                         tint = DarkText
                     )
                 },
 
                 singleLine = true,
 
-                shape = RoundedCornerShape(16.dp),
+                shape =
+                    RoundedCornerShape(16.dp),
 
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color.White,
-                    unfocusedContainerColor = Color.White,
-                    disabledContainerColor = Color.White,
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent
-                )
+                colors =
+                    TextFieldDefaults.colors(
+
+                        focusedContainerColor =
+                            Color.White,
+
+                        unfocusedContainerColor =
+                            Color.White,
+
+                        disabledContainerColor =
+                            Color.White,
+
+                        focusedIndicatorColor =
+                            Color.Transparent,
+
+                        unfocusedIndicatorColor =
+                            Color.Transparent
+                    )
             )
 
             Spacer(
@@ -283,23 +369,36 @@ fun HomeScreen(
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+
+                verticalAlignment =
+                    Alignment.CenterVertically,
+
+                horizontalArrangement =
+                    Arrangement.SpaceBetween
             ) {
 
                 Text(
                     text = "Messages",
+
                     fontSize = 21.sp,
-                    fontWeight = FontWeight.Bold,
+
+                    fontWeight =
+                        FontWeight.Bold,
+
                     color = DarkText
                 )
 
                 IconButton(
                     onClick = {}
                 ) {
+
                     Icon(
-                        imageVector = Icons.Default.MoreVert,
-                        contentDescription = "More options",
+                        imageVector =
+                            Icons.Default.MoreVert,
+
+                        contentDescription =
+                            "More options",
+
                         tint = DarkText
                     )
                 }
@@ -309,9 +408,9 @@ fun HomeScreen(
                 modifier = Modifier.height(8.dp)
             )
 
-            // =================================================
+
             // LOADING
-            // =================================================
+
 
             if (isLoadingConversations) {
 
@@ -320,28 +419,33 @@ fun HomeScreen(
                         .fillMaxWidth()
                         .weight(1f),
 
-                    contentAlignment = Alignment.Center
+                    contentAlignment =
+                        Alignment.Center
                 ) {
 
                     Text(
-                        text = "Loading conversations...",
+                        text =
+                            "Loading conversations...",
+
                         color = Color.Gray,
+
                         fontSize = 14.sp
                     )
                 }
 
             } else if (conversationError != null) {
 
-                // =============================================
+
                 // ERROR
-                // =============================================
+
 
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
 
-                    contentAlignment = Alignment.Center
+                    contentAlignment =
+                        Alignment.Center
                 ) {
 
                     Column(
@@ -350,19 +454,28 @@ fun HomeScreen(
                     ) {
 
                         Text(
-                            text = "Unable to load conversations",
+                            text =
+                                "Unable to load conversations",
+
                             fontSize = 17.sp,
-                            fontWeight = FontWeight.Bold,
+
+                            fontWeight =
+                                FontWeight.Bold,
+
                             color = DarkText
                         )
 
                         Spacer(
-                            modifier = Modifier.height(6.dp)
+                            modifier =
+                                Modifier.height(6.dp)
                         )
 
                         Text(
-                            text = conversationError,
+                            text =
+                                conversationError,
+
                             fontSize = 13.sp,
+
                             color = Color.Gray
                         )
                     }
@@ -370,16 +483,17 @@ fun HomeScreen(
 
             } else if (filteredConversations.isEmpty()) {
 
-                // =============================================
+
                 // EMPTY STATE
-                // =============================================
+
 
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
 
-                    contentAlignment = Alignment.Center
+                    contentAlignment =
+                        Alignment.Center
                 ) {
 
                     Column(
@@ -393,7 +507,8 @@ fun HomeScreen(
                                 .clip(CircleShape)
                                 .background(LightMint),
 
-                            contentAlignment = Alignment.Center
+                            contentAlignment =
+                                Alignment.Center
                         ) {
 
                             Icon(
@@ -411,7 +526,8 @@ fun HomeScreen(
                         }
 
                         Spacer(
-                            modifier = Modifier.height(18.dp)
+                            modifier =
+                                Modifier.height(18.dp)
                         )
 
                         Text(
@@ -423,12 +539,16 @@ fun HomeScreen(
                                 },
 
                             fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
+
+                            fontWeight =
+                                FontWeight.Bold,
+
                             color = DarkText
                         )
 
                         Spacer(
-                            modifier = Modifier.height(6.dp)
+                            modifier =
+                                Modifier.height(6.dp)
                         )
 
                         Text(
@@ -440,6 +560,7 @@ fun HomeScreen(
                                 },
 
                             fontSize = 14.sp,
+
                             color = Color.Gray
                         )
                     }
@@ -447,9 +568,9 @@ fun HomeScreen(
 
             } else {
 
-                // =============================================
+
                 // REAL CONVERSATION LIST
-                // =============================================
+
 
                 LazyColumn(
                     modifier = Modifier
@@ -461,11 +582,13 @@ fun HomeScreen(
                 ) {
 
                     items(
-                        items = filteredConversations,
+                        items =
+                            filteredConversations,
 
                         key = { chat ->
                             chat.userId
                         }
+
                     ) { chat ->
 
                         ChatListItem(
@@ -498,12 +621,13 @@ private fun ChatListItem(
             }
             .padding(14.dp),
 
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment =
+            Alignment.CenterVertically
     ) {
 
-        // =====================================================
+
         // AVATAR
-        // =====================================================
+
 
         Box(
             modifier = Modifier
@@ -517,14 +641,19 @@ private fun ChatListItem(
                     }
                 ),
 
-            contentAlignment = Alignment.Center
+            contentAlignment =
+                Alignment.Center
         ) {
 
             if (chat.isGroup) {
 
                 Icon(
-                    imageVector = Icons.Default.Groups,
-                    contentDescription = "Group",
+                    imageVector =
+                        Icons.Default.Groups,
+
+                    contentDescription =
+                        "Group",
+
                     tint = DarkGreen
                 )
 
@@ -537,7 +666,10 @@ private fun ChatListItem(
                         ?: "?",
 
                     fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
+
+                    fontWeight =
+                        FontWeight.Bold,
+
                     color = DarkGreen
                 )
             }
@@ -561,9 +693,9 @@ private fun ChatListItem(
             modifier = Modifier.size(13.dp)
         )
 
-        // =====================================================
+
         // CHAT INFORMATION
-        // =====================================================
+
 
         Column(
             modifier = Modifier.weight(1f)
@@ -573,7 +705,10 @@ private fun ChatListItem(
                 text = chat.name,
 
                 fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
+
+                fontWeight =
+                    FontWeight.SemiBold,
+
                 color = DarkText,
 
                 maxLines = 1,
@@ -583,7 +718,8 @@ private fun ChatListItem(
             )
 
             Spacer(
-                modifier = Modifier.height(4.dp)
+                modifier =
+                    Modifier.height(4.dp)
             )
 
             Text(
@@ -595,6 +731,7 @@ private fun ChatListItem(
                     },
 
                 fontSize = 13.sp,
+
                 color = Color.Gray,
 
                 maxLines = 1,
@@ -624,7 +761,8 @@ private fun ChatListItem(
             if (chat.unreadCount > 0) {
 
                 Spacer(
-                    modifier = Modifier.height(5.dp)
+                    modifier =
+                        Modifier.height(5.dp)
                 )
 
                 Box(
@@ -633,7 +771,8 @@ private fun ChatListItem(
                         .clip(CircleShape)
                         .background(DarkGreen),
 
-                    contentAlignment = Alignment.Center
+                    contentAlignment =
+                        Alignment.Center
                 ) {
 
                     Text(
@@ -646,7 +785,8 @@ private fun ChatListItem(
 
                         fontSize = 10.sp,
 
-                        fontWeight = FontWeight.Bold,
+                        fontWeight =
+                            FontWeight.Bold,
 
                         color = Color.White
                     )
