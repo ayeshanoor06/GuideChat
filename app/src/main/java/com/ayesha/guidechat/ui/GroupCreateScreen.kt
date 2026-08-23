@@ -50,6 +50,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.ayesha.guidechat.data.GroupRepository
 import com.ayesha.guidechat.data.UserRepository
 import com.ayesha.guidechat.model.UserProfile
 
@@ -69,9 +70,21 @@ fun GroupCreateScreen(
 
     val context = LocalContext.current
 
+
+    // REPOSITORIES
+
+
     val userRepository = remember {
         UserRepository()
     }
+
+    val groupRepository = remember {
+        GroupRepository()
+    }
+
+
+    // STATES
+
 
     var groupName by remember {
         mutableStateOf("")
@@ -89,26 +102,30 @@ fun GroupCreateScreen(
         mutableStateOf(true)
     }
 
+    var isCreatingGroup by remember {
+        mutableStateOf(false)
+    }
+
     var errorMessage by remember {
         mutableStateOf<String?>(null)
     }
 
-    // =========================================================
-    // LOAD REAL USERS FROM FIRESTORE
-    // =========================================================
+
+    // LOAD USERS
+
 
     LaunchedEffect(Unit) {
 
         isLoading = true
         errorMessage = null
 
-        userRepository.getAllUsers(
+        userRepository.searchUsers(
+            searchText = "",
+            currentUserId = currentUserId,
 
             onSuccess = { result ->
 
-                users = result.filter { user ->
-                    user.uid != currentUserId
-                }
+                users = result
 
                 isLoading = false
             },
@@ -116,11 +133,14 @@ fun GroupCreateScreen(
             onError = { error ->
 
                 isLoading = false
-
                 errorMessage = error
             }
         )
     }
+
+
+    // SCREEN
+
 
     Scaffold(
 
@@ -142,7 +162,8 @@ fun GroupCreateScreen(
                 navigationIcon = {
 
                     IconButton(
-                        onClick = onBack
+                        onClick = onBack,
+                        enabled = !isCreatingGroup
                     ) {
 
                         Icon(
@@ -158,9 +179,11 @@ fun GroupCreateScreen(
                 )
             )
         }
+
     ) { paddingValues ->
 
         Column(
+
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
@@ -171,11 +194,12 @@ fun GroupCreateScreen(
                 modifier = Modifier.height(10.dp)
             )
 
-            // =================================================
+
             // GROUP ICON
-            // =================================================
+
 
             Box(
+
                 modifier = Modifier
                     .size(72.dp)
                     .clip(CircleShape)
@@ -183,12 +207,17 @@ fun GroupCreateScreen(
                     .align(Alignment.CenterHorizontally),
 
                 contentAlignment = Alignment.Center
+
             ) {
 
                 Icon(
+
                     imageVector = Icons.Default.Group,
+
                     contentDescription = "Group",
+
                     tint = GuideGreen,
+
                     modifier = Modifier.size(38.dp)
                 )
             }
@@ -196,6 +225,10 @@ fun GroupCreateScreen(
             Spacer(
                 modifier = Modifier.height(16.dp)
             )
+
+
+            // GROUP INFORMATION
+
 
             Text(
                 text = "Group Information",
@@ -208,9 +241,9 @@ fun GroupCreateScreen(
                 modifier = Modifier.height(12.dp)
             )
 
-            // =================================================
+
             // GROUP NAME
-            // =================================================
+
 
             OutlinedTextField(
 
@@ -224,6 +257,8 @@ fun GroupCreateScreen(
 
                 singleLine = true,
 
+                enabled = !isCreatingGroup,
+
                 label = {
                     Text("Group Name")
                 },
@@ -235,9 +270,14 @@ fun GroupCreateScreen(
                 shape = RoundedCornerShape(14.dp),
 
                 colors = OutlinedTextFieldDefaults.colors(
+
                     focusedBorderColor = GuideGreen,
-                    unfocusedBorderColor = Color(0xFFD5DED7),
+
+                    unfocusedBorderColor =
+                        Color(0xFFD5DED7),
+
                     focusedLabelColor = GuideGreen,
+
                     cursorColor = GuideGreen
                 )
             )
@@ -246,28 +286,45 @@ fun GroupCreateScreen(
                 modifier = Modifier.height(22.dp)
             )
 
-            // =================================================
+
             // MEMBER TITLE
-            // =================================================
+
 
             Row(
+
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+
+                verticalAlignment =
+                    Alignment.CenterVertically
+
             ) {
 
                 Text(
+
                     text = "Select Members",
+
                     fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
+
+                    fontWeight =
+                        FontWeight.Bold,
+
                     color = GuideText,
-                    modifier = Modifier.weight(1f)
+
+                    modifier =
+                        Modifier.weight(1f)
                 )
 
                 Text(
-                    text = "${selectedUsers.size} selected",
+
+                    text =
+                        "${selectedUsers.size} selected",
+
                     fontSize = 13.sp,
+
                     color = GuideGreen,
-                    fontWeight = FontWeight.SemiBold
+
+                    fontWeight =
+                        FontWeight.SemiBold
                 )
             }
 
@@ -275,18 +332,21 @@ fun GroupCreateScreen(
                 modifier = Modifier.height(10.dp)
             )
 
-            // =================================================
+
             // LOADING
-            // =================================================
+
 
             if (isLoading) {
 
                 Box(
+
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
 
-                    contentAlignment = Alignment.Center
+                    contentAlignment =
+                        Alignment.Center
+
                 ) {
 
                     CircularProgressIndicator(
@@ -296,39 +356,53 @@ fun GroupCreateScreen(
 
             } else if (errorMessage != null) {
 
-                // =============================================
+
                 // ERROR
-                // =============================================
+
 
                 Box(
+
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
 
-                    contentAlignment = Alignment.Center
+                    contentAlignment =
+                        Alignment.Center
+
                 ) {
 
                     Column(
+
                         horizontalAlignment =
                             Alignment.CenterHorizontally
+
                     ) {
 
                         Text(
-                            text = errorMessage
-                                ?: "Unable to load users",
 
-                            color = Color(0xFFB3261E),
+                            text =
+                                errorMessage
+                                    ?: "Unable to load users",
+
+                            color =
+                                Color(0xFFB3261E),
 
                             fontSize = 14.sp
                         )
 
                         Spacer(
-                            modifier = Modifier.height(10.dp)
+                            modifier =
+                                Modifier.height(10.dp)
                         )
 
                         Text(
-                            text = "Please check your internet connection.",
-                            color = GuideSecondary,
+
+                            text =
+                                "Please check your internet connection.",
+
+                            color =
+                                GuideSecondary,
+
                             fontSize = 13.sp
                         )
                     }
@@ -336,57 +410,76 @@ fun GroupCreateScreen(
 
             } else if (users.isEmpty()) {
 
-                // =============================================
+
                 // NO USERS
-                // =============================================
+
 
                 Box(
+
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
 
-                    contentAlignment = Alignment.Center
+                    contentAlignment =
+                        Alignment.Center
+
                 ) {
 
                     Text(
-                        text = "No other users found.",
-                        color = GuideSecondary,
+
+                        text =
+                            "No other users found.",
+
+                        color =
+                            GuideSecondary,
+
                         fontSize = 14.sp
                     )
                 }
 
             } else {
 
-                // =============================================
-                // REAL FIRESTORE USERS
-                // =============================================
+                // USER LIST
+
 
                 LazyColumn(
+
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
 
                     verticalArrangement =
                         Arrangement.spacedBy(10.dp)
+
                 ) {
 
                     items(
+
                         items = users,
+
                         key = { user ->
                             user.uid
                         }
+
                     ) { user ->
 
                         val isSelected =
-                            selectedUsers.contains(user.uid)
+                            selectedUsers.contains(
+                                user.uid
+                            )
 
                         UserSelectionCard(
 
                             user = user,
 
-                            isSelected = isSelected,
+                            isSelected =
+                                isSelected,
 
                             onClick = {
+
+                                if (isCreatingGroup) {
+                                    return@UserSelectionCard
+                                }
 
                                 if (isSelected) {
 
@@ -410,86 +503,169 @@ fun GroupCreateScreen(
                 modifier = Modifier.height(12.dp)
             )
 
-            // =================================================
+
             // CREATE GROUP BUTTON
-            // =================================================
+
 
             Button(
 
                 onClick = {
 
-                    when {
+                    if (isCreatingGroup) {
+                        return@Button
+                    }
 
-                        groupName.trim().isEmpty() -> {
+
+                    // VALIDATE GROUP NAME
+
+
+                    if (groupName.trim().isEmpty()) {
+
+                        Toast.makeText(
+                            context,
+                            "Please enter a group name",
+                            Toast.LENGTH_SHORT
+                        ).show()
+
+                        return@Button
+                    }
+
+
+                    // VALIDATE MEMBERS
+
+
+                    if (selectedUsers.isEmpty()) {
+
+                        Toast.makeText(
+                            context,
+                            "Please select at least one member",
+                            Toast.LENGTH_SHORT
+                        ).show()
+
+                        return@Button
+                    }
+
+
+                    // START CREATION
+
+
+                    isCreatingGroup = true
+
+                    val memberIds =
+                        selectedUsers.toList()
+
+
+                    // CREATE REAL FIRESTORE GROUP
+
+                    groupRepository.createGroup(
+
+                        name = groupName.trim(),
+
+                        createdBy = currentUserId,
+
+                        memberIds = memberIds,
+
+                        onSuccess = { groupId ->
+
+                            isCreatingGroup = false
 
                             Toast.makeText(
                                 context,
-                                "Please enter a group name",
+                                "Group created successfully!",
                                 Toast.LENGTH_SHORT
                             ).show()
-                        }
 
-                        selectedUsers.isEmpty() -> {
-
-                            Toast.makeText(
-                                context,
-                                "Please select at least one member",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-
-                        else -> {
-
-                            val memberIds =
-                                selectedUsers.toList()
-
-                            /*
-                             * The current user is automatically
-                             * included in the group.
-                             */
+                            // ---------------------------------
+                            // SEND REAL GROUP ID BACK
+                            // ---------------------------------
 
                             val allMemberIds =
-                                listOf(currentUserId) +
-                                        memberIds
-
-                            /*
-                             * We use a temporary local group ID
-                             * here.
-                             *
-                             * The next part of STEP 9 will connect
-                             * this to Firestore and create the real
-                             * group document.
-                             */
-
-                            val temporaryGroupId =
-                                "group_${System.currentTimeMillis()}"
+                                (memberIds + currentUserId)
+                                    .distinct()
 
                             onGroupCreated(
-                                temporaryGroupId,
+
+                                groupId,
+
                                 groupName.trim(),
+
                                 allMemberIds
                             )
+                        },
+
+                        onError = { error ->
+
+                            isCreatingGroup = false
+
+                            Toast.makeText(
+                                context,
+                                error,
+                                Toast.LENGTH_LONG
+                            ).show()
                         }
-                    }
+                    )
                 },
+
+                enabled =
+                    !isCreatingGroup,
 
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(54.dp),
 
-                shape = RoundedCornerShape(14.dp),
+                shape =
+                    RoundedCornerShape(14.dp),
 
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = GuideGreen,
-                    contentColor = Color.White
-                )
+                colors =
+                    ButtonDefaults.buttonColors(
+
+                        containerColor =
+                            GuideGreen,
+
+                        contentColor =
+                            Color.White,
+
+                        disabledContainerColor =
+                            Color(0xFF9BBBA4)
+                    )
+
             ) {
 
-                Text(
-                    text = "CREATE GROUP",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                if (isCreatingGroup) {
+
+                    CircularProgressIndicator(
+
+                        modifier =
+                            Modifier.size(22.dp),
+
+                        color =
+                            Color.White,
+
+                        strokeWidth =
+                            2.dp
+                    )
+
+                    Spacer(
+                        modifier =
+                            Modifier.size(10.dp)
+                    )
+
+                    Text(
+                        text = "CREATING...",
+                        fontSize = 14.sp,
+                        fontWeight =
+                            FontWeight.Bold
+                    )
+
+                } else {
+
+                    Text(
+                        text = "CREATE GROUP",
+                        fontSize = 14.sp,
+                        fontWeight =
+                            FontWeight.Bold
+                    )
+                }
             }
 
             Spacer(
@@ -499,15 +675,20 @@ fun GroupCreateScreen(
     }
 }
 
-// =============================================================
+
+
 // USER SELECTION CARD
-// =============================================================
+
 
 @Composable
 private fun UserSelectionCard(
+
     user: UserProfile,
+
     isSelected: Boolean,
+
     onClick: () -> Unit
+
 ) {
 
     Card(
@@ -518,20 +699,25 @@ private fun UserSelectionCard(
                 onClick()
             },
 
-        shape = RoundedCornerShape(16.dp),
+        shape =
+            RoundedCornerShape(16.dp),
 
-        colors = CardDefaults.cardColors(
-            containerColor =
-                if (isSelected) {
-                    Color(0xFFE7F8EC)
-                } else {
-                    Color.White
-                }
-        ),
+        colors =
+            CardDefaults.cardColors(
 
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = 2.dp
-        )
+                containerColor =
+                    if (isSelected) {
+                        Color(0xFFE7F8EC)
+                    } else {
+                        Color.White
+                    }
+            ),
+
+        elevation =
+            CardDefaults.cardElevation(
+                defaultElevation = 2.dp
+            )
+
     ) {
 
         Row(
@@ -542,11 +728,12 @@ private fun UserSelectionCard(
 
             verticalAlignment =
                 Alignment.CenterVertically
+
         ) {
 
-            // =================================================
+
             // AVATAR
-            // =================================================
+
 
             Box(
 
@@ -554,6 +741,7 @@ private fun UserSelectionCard(
                     .size(48.dp)
                     .clip(CircleShape)
                     .background(
+
                         if (isSelected) {
                             GuideGreen
                         } else {
@@ -563,6 +751,7 @@ private fun UserSelectionCard(
 
                 contentAlignment =
                     Alignment.Center
+
             ) {
 
                 Text(
@@ -589,15 +778,19 @@ private fun UserSelectionCard(
             }
 
             Spacer(
-                modifier = Modifier.size(14.dp)
+                modifier =
+                    Modifier.size(14.dp)
             )
 
-            // =================================================
+
             // USER DETAILS
-            // =================================================
+
 
             Column(
-                modifier = Modifier.weight(1f)
+
+                modifier =
+                    Modifier.weight(1f)
+
             ) {
 
                 Text(
@@ -608,7 +801,8 @@ private fun UserSelectionCard(
                                 "Unnamed User"
                             },
 
-                    color = GuideText,
+                    color =
+                        GuideText,
 
                     fontSize = 16.sp,
 
@@ -617,7 +811,8 @@ private fun UserSelectionCard(
                 )
 
                 Spacer(
-                    modifier = Modifier.height(3.dp)
+                    modifier =
+                        Modifier.height(3.dp)
                 )
 
                 Text(
@@ -631,7 +826,8 @@ private fun UserSelectionCard(
                                 it.uppercase()
                             },
 
-                    color = GuideSecondary,
+                    color =
+                        GuideSecondary,
 
                     fontSize = 13.sp
                 )
@@ -639,23 +835,26 @@ private fun UserSelectionCard(
                 if (user.email.isNotBlank()) {
 
                     Spacer(
-                        modifier = Modifier.height(2.dp)
+                        modifier =
+                            Modifier.height(2.dp)
                     )
 
                     Text(
 
-                        text = user.email,
+                        text =
+                            user.email,
 
-                        color = GuideSecondary,
+                        color =
+                            GuideSecondary,
 
                         fontSize = 12.sp
                     )
                 }
             }
 
-            // =================================================
+
             // SELECTION INDICATOR
-            // =================================================
+
 
             Box(
 
@@ -663,6 +862,7 @@ private fun UserSelectionCard(
                     .size(28.dp)
                     .clip(CircleShape)
                     .background(
+
                         if (isSelected) {
                             GuideGreen
                         } else {
@@ -672,6 +872,7 @@ private fun UserSelectionCard(
 
                 contentAlignment =
                     Alignment.Center
+
             ) {
 
                 if (isSelected) {
@@ -684,7 +885,8 @@ private fun UserSelectionCard(
                         contentDescription =
                             "Selected",
 
-                        tint = Color.White,
+                        tint =
+                            Color.White,
 
                         modifier =
                             Modifier.size(18.dp)

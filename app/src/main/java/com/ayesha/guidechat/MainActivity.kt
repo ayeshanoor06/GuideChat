@@ -1,5 +1,7 @@
 package com.ayesha.guidechat
 
+import com.ayesha.guidechat.ui.GroupChatScreen
+import com.ayesha.guidechat.data.GroupRepository
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -80,6 +82,8 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun GuideChatApp() {
 
+    val context = LocalContext.current
+
     var currentScreen by remember {
         mutableStateOf("login")
     }
@@ -100,6 +104,10 @@ fun GuideChatApp() {
         mutableStateOf<GroupModel?>(null)
     }
 
+
+    // REPOSITORIES
+
+
     val userRepository = remember {
         UserRepository()
     }
@@ -107,6 +115,14 @@ fun GuideChatApp() {
     val conversationRepository = remember {
         ConversationRepository()
     }
+
+    val groupRepository = remember {
+        GroupRepository()
+    }
+
+
+    // CONVERSATIONS
+
 
     var conversations by remember {
         mutableStateOf<List<ChatPreview>>(emptyList())
@@ -127,26 +143,42 @@ fun GuideChatApp() {
     DisposableEffect(currentScreen) {
 
         val firebaseUser =
-            FirebaseAuth.getInstance().currentUser
+            FirebaseAuth
+                .getInstance()
+                .currentUser
 
-        if (currentScreen == "home" && firebaseUser != null) {
+        if (
+            currentScreen == "home" &&
+            firebaseUser != null
+        ) {
 
             isLoadingConversations = true
             conversationError = null
 
             val listener =
                 conversationRepository.listenForConversations(
-                    currentUserId = firebaseUser.uid,
+
+                    currentUserId =
+                        firebaseUser.uid,
 
                     onConversationsChanged = { result ->
+
                         conversations = result
-                        isLoadingConversations = false
-                        conversationError = null
+
+                        isLoadingConversations =
+                            false
+
+                        conversationError =
+                            null
                     },
 
                     onError = { error ->
-                        isLoadingConversations = false
-                        conversationError = error
+
+                        isLoadingConversations =
+                            false
+
+                        conversationError =
+                            error
                     }
                 )
 
@@ -169,19 +201,24 @@ fun GuideChatApp() {
         if (currentScreen == "home") {
 
             val firebaseUser =
-                FirebaseAuth.getInstance().currentUser
+                FirebaseAuth
+                    .getInstance()
+                    .currentUser
 
             if (firebaseUser != null) {
 
                 userRepository.getUserProfile(
+
                     uid = firebaseUser.uid,
 
                     onSuccess = { profile ->
-                        currentUserProfile = profile
+
+                        currentUserProfile =
+                            profile
                     },
 
                     onError = {
-                        // Keep the generic "User" fallback.
+                        // Keep generic User fallback
                     }
                 )
             }
@@ -201,6 +238,7 @@ fun GuideChatApp() {
         "login" -> {
 
             LoginScreen(
+
                 onLoginSuccess = {
 
                     currentUserProfile = null
@@ -224,6 +262,7 @@ fun GuideChatApp() {
         "register" -> {
 
             RegisterScreen(
+
                 onBackToLogin = {
 
                     currentScreen = "login"
@@ -247,28 +286,38 @@ fun GuideChatApp() {
                     ?: "User"
 
             HomeScreen(
+
                 userName = displayName,
 
                 conversations = conversations,
 
-                isLoadingConversations = isLoadingConversations,
+                isLoadingConversations =
+                    isLoadingConversations,
 
-                conversationError = conversationError,
+                conversationError =
+                    conversationError,
 
                 onChatClick = { chat ->
-                    // your existing code
+
+                    // Existing chat handling
                 },
 
                 onNewChatClick = {
-                    currentScreen = "userSearch"
+
+                    currentScreen =
+                        "userSearch"
                 },
 
                 onSearchClick = {
-                    currentScreen = "userSearch"
+
+                    currentScreen =
+                        "userSearch"
                 },
 
                 onGroupsClick = {
-                    currentScreen = "groups"
+
+                    currentScreen =
+                        "groups"
                 }
             )
         }
@@ -280,7 +329,9 @@ fun GuideChatApp() {
         "userSearch" -> {
 
             val firebaseUser =
-                FirebaseAuth.getInstance().currentUser
+                FirebaseAuth
+                    .getInstance()
+                    .currentUser
 
             if (firebaseUser != null) {
 
@@ -291,30 +342,37 @@ fun GuideChatApp() {
 
                     onBack = {
 
-                        currentScreen = "home"
+                        currentScreen =
+                            "home"
                     },
 
                     onUserSelected = { user ->
 
-                        selectedUser = user
+                        selectedUser =
+                            user
 
-                        currentScreen = "chat"
+                        currentScreen =
+                            "chat"
                     }
                 )
 
             } else {
 
-                currentScreen = "login"
+                currentScreen =
+                    "login"
             }
         }
 
 
         // ONE-TO-ONE CHAT
 
+
         "chat" -> {
 
             val firebaseUser =
-                FirebaseAuth.getInstance().currentUser
+                FirebaseAuth
+                    .getInstance()
+                    .currentUser
 
             val otherUser =
                 selectedUser
@@ -342,13 +400,15 @@ fun GuideChatApp() {
 
                     onBack = {
 
-                        currentScreen = "userSearch"
+                        currentScreen =
+                            "userSearch"
                     }
                 )
 
             } else {
 
-                currentScreen = "home"
+                currentScreen =
+                    "home"
             }
         }
 
@@ -372,25 +432,65 @@ fun GuideChatApp() {
 
                     onBack = {
 
-                        currentScreen = "home"
+                        currentScreen =
+                            "home"
                     },
 
                     onCreateGroup = {
 
-                        currentScreen = "createGroup"
+                        currentScreen =
+                            "createGroup"
                     },
 
                     onGroupClick = { group ->
 
                         selectedGroup = group
 
-
+                        currentScreen = "groupChat"
                     }
                 )
 
             } else {
 
-                currentScreen = "login"
+                currentScreen =
+                    "login"
+            }
+        }
+
+// GROUP CHAT
+
+
+        "groupChat" -> {
+
+            val firebaseUser =
+                FirebaseAuth
+                    .getInstance()
+                    .currentUser
+
+            val group =
+                selectedGroup
+
+            if (
+                firebaseUser != null &&
+                group != null
+            ) {
+
+                GroupChatScreen(
+
+                    group = group,
+
+                    currentUserId =
+                        firebaseUser.uid,
+
+                    onBack = {
+
+                        currentScreen = "groups"
+                    }
+                )
+
+            } else {
+
+                currentScreen = "groups"
             }
         }
 
@@ -408,30 +508,105 @@ fun GuideChatApp() {
             if (firebaseUser != null) {
 
                 GroupCreateScreen(
-                    currentUserId = firebaseUser.uid,
+
+                    currentUserId =
+                        firebaseUser.uid,
 
                     onBack = {
-                        currentScreen = "home"
+
+                        currentScreen =
+                            "groups"
                     },
 
-                    onGroupCreated = { groupId, groupName, memberIds ->
+                    onGroupCreated = {
+                            _,
+                            groupName,
+                            memberIds ->
 
-                        currentScreen = "home"
+
+                        // CREATE REAL FIRESTORE GROUP
+
+
+                        groupRepository.createGroup(
+
+                            name =
+                                groupName,
+
+                            createdBy =
+                                firebaseUser.uid,
+
+                            memberIds =
+                                memberIds,
+
+                            onSuccess = { createdGroupId ->
+
+
+                                // SAVE SELECTED GROUP LOCALLY
+
+
+                                selectedGroup =
+                                    GroupModel(
+
+                                        id =
+                                            createdGroupId,
+
+                                        name =
+                                            groupName,
+
+                                        createdBy =
+                                            firebaseUser.uid,
+
+                                        createdAt =
+                                            System
+                                                .currentTimeMillis(),
+
+                                        memberIds =
+                                            memberIds
+                                    )
+
+
+                                // SUCCESS MESSAGE
+
+
+                                Toast.makeText(
+                                    context,
+                                    "Group created successfully!",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+
+
+
+                                currentScreen =
+                                    "groups"
+                            },
+
+                            onError = { error ->
+
+                                Toast.makeText(
+                                    context,
+                                    error,
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        )
                     }
                 )
 
             } else {
 
-                currentScreen = "login"
+                currentScreen =
+                    "login"
             }
         }
+
 
         // FALLBACK
 
 
         else -> {
 
-            currentScreen = "login"
+            currentScreen =
+                "login"
         }
     }
 }
