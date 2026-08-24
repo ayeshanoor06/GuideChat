@@ -8,11 +8,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Icon
@@ -43,27 +44,51 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ayesha.guidechat.data.GroupMessage
+import com.ayesha.guidechat.data.GroupModel
 import com.ayesha.guidechat.data.GroupRepository
+import com.ayesha.guidechat.data.UserRepository
+import com.ayesha.guidechat.model.UserProfile
 
-private val GroupGreen = Color(0xFF2E6F40)
-private val GroupLightGreen = Color(0xFFCFFDDC)
-private val GroupBackground = Color(0xFFF8FBF9)
-private val GroupText = Color(0xFF253D2C)
-private val GroupSecondary = Color(0xFF6B756E)
+private val GroupGreen =
+    Color(0xFF2E6F40)
+
+private val GroupLightGreen =
+    Color(0xFFCFFDDC)
+
+private val GroupBackground =
+    Color(0xFFF8FBF9)
+
+private val GroupText =
+    Color(0xFF253D2C)
+
+private val GroupSecondary =
+    Color(0xFF6B756E)
+
+private val ReadBlue =
+    Color(0xFF2196F3)
+
 
 @Composable
 fun GroupChatScreen(
-    group: com.ayesha.guidechat.data.GroupModel,
+    group: GroupModel,
     currentUserId: String,
     onBack: () -> Unit
 ) {
 
-    val repository = remember {
-        GroupRepository()
-    }
+    val groupRepository =
+        remember {
+            GroupRepository()
+        }
+
+    val userRepository =
+        remember {
+            UserRepository()
+        }
 
     var messages by remember {
-        mutableStateOf<List<GroupMessage>>(emptyList())
+        mutableStateOf<List<GroupMessage>>(
+            emptyList()
+        )
     }
 
     var messageText by remember {
@@ -74,28 +99,78 @@ fun GroupChatScreen(
         mutableStateOf<String?>(null)
     }
 
-    val listState = rememberLazyListState()
+    var usersById by remember {
+        mutableStateOf<Map<String, UserProfile>>(
+            emptyMap()
+        )
+    }
+
+    val listState =
+        rememberLazyListState()
+
+
+
+    // LOAD GROUP MEMBERS
+
+
+    LaunchedEffect(
+        group.id,
+        group.memberIds
+    ) {
+
+        val loadedUsers =
+            mutableMapOf<String, UserProfile>()
+
+        group.memberIds.forEach { memberId ->
+
+            userRepository.getUserProfile(
+
+                uid = memberId,
+
+                onSuccess = { profile ->
+
+                    loadedUsers[memberId] =
+                        profile
+
+                    usersById =
+                        loadedUsers.toMap()
+                },
+
+                onError = {
+                    // UID fallback is used.
+                }
+            )
+        }
+    }
+
 
 
     // LISTEN FOR GROUP MESSAGES
 
 
-    DisposableEffect(group.id) {
+    DisposableEffect(
+        group.id
+    ) {
 
         val listener =
-            repository.listenToGroupMessages(
-                groupId = group.id,
+            groupRepository.listenToGroupMessages(
+
+                groupId =
+                    group.id,
 
                 onMessagesChanged = { result ->
 
-                    messages = result
+                    messages =
+                        result
 
-                    errorMessage = null
+                    errorMessage =
+                        null
                 },
 
                 onError = { error ->
 
-                    errorMessage = error
+                    errorMessage =
+                        error
                 }
             )
 
@@ -105,12 +180,56 @@ fun GroupChatScreen(
     }
 
 
+
+    // MARK RECEIVED GROUP MESSAGES AS READ
+
+    LaunchedEffect(
+        messages,
+        group.id,
+        currentUserId
+    ) {
+
+        messages.forEach { message ->
+
+            // Don't mark our own messages again.
+            if (
+                message.senderId !=
+                currentUserId
+            ) {
+
+                if (
+                    !message.readBy
+                        .contains(currentUserId)
+                ) {
+
+                    groupRepository
+                        .markGroupMessageAsRead(
+                            groupId =
+                                group.id,
+
+                            messageId =
+                                message.id,
+
+                            userId =
+                                currentUserId
+                        )
+                }
+            }
+        }
+    }
+
+
+
     // SCROLL TO LATEST MESSAGE
 
 
-    LaunchedEffect(messages.size) {
+    LaunchedEffect(
+        messages.size
+    ) {
 
-        if (messages.isNotEmpty()) {
+        if (
+            messages.isNotEmpty()
+        ) {
 
             listState.animateScrollToItem(
                 messages.lastIndex
@@ -118,19 +237,30 @@ fun GroupChatScreen(
         }
     }
 
+
     Scaffold(
-        containerColor = GroupBackground,
+
+        containerColor =
+            GroupBackground,
+
+
+        // TOP BAR
+
 
         topBar = {
 
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.White)
-                    .padding(
-                        horizontal = 8.dp,
-                        vertical = 10.dp
-                    ),
+
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .background(
+                            Color.White
+                        )
+                        .padding(
+                            horizontal = 8.dp,
+                            vertical = 10.dp
+                        ),
 
                 verticalAlignment =
                     Alignment.CenterVertically
@@ -147,15 +277,22 @@ fun GroupChatScreen(
                         contentDescription =
                             "Back",
 
-                        tint = GroupText
+                        tint =
+                            GroupText
                     )
                 }
 
                 Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(GroupLightGreen),
+
+                    modifier =
+                        Modifier
+                            .size(44.dp)
+                            .clip(
+                                CircleShape
+                            )
+                            .background(
+                                GroupLightGreen
+                            ),
 
                     contentAlignment =
                         Alignment.Center
@@ -168,7 +305,8 @@ fun GroupChatScreen(
                         contentDescription =
                             "Group",
 
-                        tint = GroupGreen
+                        tint =
+                            GroupGreen
                     )
                 }
 
@@ -180,40 +318,55 @@ fun GroupChatScreen(
                 Column {
 
                     Text(
+
                         text =
                             group.name.ifBlank {
                                 "Group"
                             },
 
-                        fontSize = 17.sp,
+                        fontSize =
+                            17.sp,
 
                         fontWeight =
                             FontWeight.Bold,
 
-                        color = GroupText
+                        color =
+                            GroupText
                     )
 
                     Text(
+
                         text =
                             "${group.memberIds.size} members",
 
-                        fontSize = 12.sp,
+                        fontSize =
+                            12.sp,
 
-                        color = GroupSecondary
+                        color =
+                            GroupSecondary
                     )
                 }
             }
         },
 
+
+
+        // MESSAGE INPUT
+
+
         bottomBar = {
 
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color.White)
-                    .navigationBarsPadding()
-                    .imePadding()
-                    .padding(10.dp),
+
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .background(
+                            Color.White
+                        )
+                        .navigationBarsPadding()
+                        .imePadding()
+                        .padding(10.dp),
 
                 verticalAlignment =
                     Alignment.CenterVertically
@@ -221,7 +374,8 @@ fun GroupChatScreen(
 
                 OutlinedTextField(
 
-                    value = messageText,
+                    value =
+                        messageText,
 
                     onValueChange = {
                         messageText = it
@@ -231,25 +385,33 @@ fun GroupChatScreen(
                         Modifier.weight(1f),
 
                     placeholder = {
-                        Text("Type a message...")
+                        Text(
+                            "Type a message..."
+                        )
                     },
 
                     singleLine = true,
 
                     shape =
-                        RoundedCornerShape(22.dp),
+                        RoundedCornerShape(
+                            22.dp
+                        ),
 
                     colors =
-                        OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor =
-                                GroupGreen,
+                        OutlinedTextFieldDefaults
+                            .colors(
 
-                            unfocusedBorderColor =
-                                Color(0xFFD5DED7),
+                                focusedBorderColor =
+                                    GroupGreen,
 
-                            cursorColor =
-                                GroupGreen
-                        )
+                                unfocusedBorderColor =
+                                    Color(
+                                        0xFFD5DED7
+                                    ),
+
+                                cursorColor =
+                                    GroupGreen
+                            )
                 )
 
                 Spacer(
@@ -264,47 +426,59 @@ fun GroupChatScreen(
                         val text =
                             messageText.trim()
 
-                        if (text.isEmpty()) {
+                        if (
+                            text.isEmpty()
+                        ) {
                             return@IconButton
                         }
 
-                        repository.sendGroupMessage(
+                        groupRepository
+                            .sendGroupMessage(
 
-                            groupId =
-                                group.id,
+                                groupId =
+                                    group.id,
 
-                            senderId =
-                                currentUserId,
+                                senderId =
+                                    currentUserId,
 
-                            text =
-                                text,
+                                text =
+                                    text,
 
-                            onSuccess = {
+                                onSuccess = {
 
-                                messageText = ""
-                            },
+                                    messageText =
+                                        ""
+                                },
 
-                            onError = { error ->
+                                onError = { error ->
 
-                                errorMessage = error
-                            }
-                        )
+                                    errorMessage =
+                                        error
+                                }
+                            )
                     },
 
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(GroupGreen)
+                    modifier =
+                        Modifier
+                            .size(48.dp)
+                            .clip(
+                                CircleShape
+                            )
+                            .background(
+                                GroupGreen
+                            )
                 ) {
 
                     Icon(
+
                         imageVector =
                             Icons.Default.Send,
 
                         contentDescription =
                             "Send",
 
-                        tint = Color.White
+                        tint =
+                            Color.White
                     )
                 }
             }
@@ -313,32 +487,56 @@ fun GroupChatScreen(
     ) { paddingValues ->
 
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
+
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(
+                        paddingValues
+                    )
         ) {
 
-            if (errorMessage != null) {
+
+            // ERROR
+
+
+            if (
+                errorMessage != null
+            ) {
 
                 Text(
+
                     text =
                         errorMessage ?: "",
 
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .padding(12.dp),
+                            .padding(
+                                12.dp
+                            ),
 
                     color =
-                        Color(0xFFB3261E),
+                        Color(
+                            0xFFB3261E
+                        ),
 
-                    fontSize = 13.sp
+                    fontSize =
+                        13.sp
                 )
             }
 
-            if (messages.isEmpty()) {
+
+
+            // EMPTY CHAT
+
+
+            if (
+                messages.isEmpty()
+            ) {
 
                 Box(
+
                     modifier =
                         Modifier.fillMaxSize(),
 
@@ -347,23 +545,29 @@ fun GroupChatScreen(
                 ) {
 
                     Column(
+
                         horizontalAlignment =
                             Alignment.CenterHorizontally
                     ) {
 
                         Box(
-                            modifier = Modifier
-                                .size(80.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    GroupLightGreen
-                                ),
+
+                            modifier =
+                                Modifier
+                                    .size(80.dp)
+                                    .clip(
+                                        CircleShape
+                                    )
+                                    .background(
+                                        GroupLightGreen
+                                    ),
 
                             contentAlignment =
                                 Alignment.Center
                         ) {
 
                             Icon(
+
                                 imageVector =
                                     Icons.Default.Group,
 
@@ -374,20 +578,26 @@ fun GroupChatScreen(
                                     GroupGreen,
 
                                 modifier =
-                                    Modifier.size(38.dp)
+                                    Modifier.size(
+                                        38.dp
+                                    )
                             )
                         }
 
                         Spacer(
                             modifier =
-                                Modifier.height(16.dp)
+                                Modifier.height(
+                                    16.dp
+                                )
                         )
 
                         Text(
+
                             text =
                                 "Start the group conversation",
 
-                            fontSize = 18.sp,
+                            fontSize =
+                                18.sp,
 
                             fontWeight =
                                 FontWeight.Bold,
@@ -398,14 +608,18 @@ fun GroupChatScreen(
 
                         Spacer(
                             modifier =
-                                Modifier.height(5.dp)
+                                Modifier.height(
+                                    5.dp
+                                )
                         )
 
                         Text(
+
                             text =
                                 "Send the first message to the group.",
 
-                            fontSize = 13.sp,
+                            fontSize =
+                                13.sp,
 
                             color =
                                 GroupSecondary
@@ -415,9 +629,14 @@ fun GroupChatScreen(
 
             } else {
 
+
+                // MESSAGE LIST
+
+
                 LazyColumn(
 
-                    state = listState,
+                    state =
+                        listState,
 
                     modifier =
                         Modifier
@@ -427,23 +646,75 @@ fun GroupChatScreen(
                             ),
 
                     verticalArrangement =
-                        Arrangement.spacedBy(8.dp)
+                        Arrangement.spacedBy(
+                            8.dp
+                        )
                 ) {
 
                     items(
-                        items = messages,
+
+                        items =
+                            messages,
 
                         key = { message ->
                             message.id
                         }
+
                     ) { message ->
 
+                        val sender =
+                            usersById[
+                                message.senderId
+                            ]
+
+                        val senderName =
+                            if (
+                                message.senderId ==
+                                currentUserId
+                            ) {
+
+                                "You"
+
+                            } else {
+
+                                sender
+                                    ?.name
+                                    ?.ifBlank {
+                                        "Member"
+                                    }
+                                    ?: "Member"
+                            }
+
+
+
+                        // CHECK WHETHER EVERY GROUP MEMBER HAS READ
+
+
+                        val allMembersRead =
+                            group.memberIds
+                                .all { memberId ->
+
+                                    message.readBy
+                                        .contains(
+                                            memberId
+                                        )
+                                }
+
+
                         GroupMessageBubble(
-                            message = message,
+
+                            message =
+                                message,
+
+                            senderName =
+                                senderName,
 
                             isMine =
                                 message.senderId ==
-                                        currentUserId
+                                        currentUserId,
+
+                            allMembersRead =
+                                allMembersRead
                         )
                     }
                 }
@@ -454,19 +725,19 @@ fun GroupChatScreen(
 
 
 
-// MESSAGE BUBBLE
+// GROUP MESSAGE BUBBLE
 
 
 @Composable
 private fun GroupMessageBubble(
     message: GroupMessage,
-    isMine: Boolean
+    senderName: String,
+    isMine: Boolean,
+    allMembersRead: Boolean
 ) {
 
     Row(
-        modifier =
-            Modifier.fillMaxWidth(),
-
+        modifier = Modifier.fillMaxWidth(),
         horizontalArrangement =
             if (isMine) {
                 Arrangement.End
@@ -476,12 +747,18 @@ private fun GroupMessageBubble(
     ) {
 
         Column(
-            modifier =
-                Modifier
+            horizontalAlignment =
+                if (isMine) {
+                    Alignment.End
+                } else {
+                    Alignment.Start
+                }
+        ) {
+
+            Column(
+                modifier = Modifier
                     .clip(
-                        RoundedCornerShape(
-                            18.dp
-                        )
+                        RoundedCornerShape(18.dp)
                     )
                     .background(
                         if (isMine) {
@@ -494,42 +771,88 @@ private fun GroupMessageBubble(
                         horizontal = 14.dp,
                         vertical = 10.dp
                     )
-        ) {
-
-            if (!isMine) {
+            ) {
 
                 Text(
-                    text =
-                        "Member",
-
+                    text = senderName,
                     fontSize = 11.sp,
-
-                    fontWeight =
-                        FontWeight.Bold,
-
+                    fontWeight = FontWeight.Bold,
                     color =
-                        GroupGreen
+                        if (isMine) {
+                            GroupLightGreen
+                        } else {
+                            GroupGreen
+                        }
                 )
 
                 Spacer(
-                    modifier =
-                        Modifier.height(3.dp)
+                    modifier = Modifier.height(3.dp)
+                )
+
+                Text(
+                    text = message.text,
+                    fontSize = 15.sp,
+                    color =
+                        if (isMine) {
+                            Color.White
+                        } else {
+                            GroupText
+                        }
                 )
             }
 
-            Text(
-                text =
-                    message.text,
 
-                fontSize = 15.sp,
+            // DOUBLE TICK
 
-                color =
-                    if (isMine) {
-                        Color.White
-                    } else {
-                        GroupText
-                    }
-            )
+
+            if (isMine) {
+
+                Row(
+                    modifier = Modifier.padding(
+                        top = 2.dp,
+                        end = 4.dp
+                    ),
+                    verticalAlignment =
+                        Alignment.CenterVertically
+                ) {
+
+                    Icon(
+                        imageVector =
+                            Icons.Default.Done,
+
+                        contentDescription =
+                            "Read status",
+
+                        modifier =
+                            Modifier.size(13.dp),
+
+                        tint =
+                            if (allMembersRead) {
+                                ReadBlue
+                            } else {
+                                GroupGreen
+                            }
+                    )
+
+                    Icon(
+                        imageVector =
+                            Icons.Default.Done,
+
+                        contentDescription =
+                            "Read status",
+
+                        modifier =
+                            Modifier.size(13.dp),
+
+                        tint =
+                            if (allMembersRead) {
+                                ReadBlue
+                            } else {
+                                GroupGreen
+                            }
+                    )
+                }
+            }
         }
     }
 }

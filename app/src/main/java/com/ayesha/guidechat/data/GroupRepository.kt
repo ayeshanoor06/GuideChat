@@ -22,7 +22,12 @@ data class GroupMessage(
 
 class GroupRepository {
 
-    private val db = FirebaseFirestore.getInstance()
+    private val db =
+        FirebaseFirestore.getInstance()
+
+
+
+    // CREATE GROUP
 
     fun createGroup(
         name: String,
@@ -32,37 +37,63 @@ class GroupRepository {
         onError: (String) -> Unit
     ) {
 
-        val cleanName = name.trim()
+        val cleanName =
+            name.trim()
 
         if (cleanName.isEmpty()) {
-            onError("Group name cannot be empty")
+
+            onError(
+                "Group name cannot be empty"
+            )
+
             return
         }
 
         val allMembers =
-            (memberIds + createdBy).distinct()
+            (memberIds + createdBy)
+                .distinct()
 
         if (allMembers.size < 2) {
-            onError("A group must have at least 2 members")
+
+            onError(
+                "A group must have at least 2 members"
+            )
+
             return
         }
 
         val groupRef =
-            db.collection("groups").document()
+            db.collection("groups")
+                .document()
 
-        val group = hashMapOf(
-            "name" to cleanName,
-            "createdBy" to createdBy,
-            "createdAt" to System.currentTimeMillis(),
-            "memberIds" to allMembers
-        )
+        val group =
+            hashMapOf(
+
+                "name" to
+                        cleanName,
+
+                "createdBy" to
+                        createdBy,
+
+                "createdAt" to
+                        System.currentTimeMillis(),
+
+                "memberIds" to
+                        allMembers
+            )
 
         groupRef
             .set(group)
+
             .addOnSuccessListener {
-                onSuccess(groupRef.id)
+
+                onSuccess(
+                    groupRef.id
+                )
             }
+
             .addOnFailureListener { exception ->
+
                 onError(
                     exception.message
                         ?: "Unable to create group"
@@ -70,54 +101,75 @@ class GroupRepository {
             }
     }
 
+
+
+    // LISTEN TO GROUPS
+
+
     fun listenToGroups(
         currentUserId: String,
         onGroupsChanged:
             (List<GroupModel>) -> Unit,
-        onError: (String) -> Unit
+        onError:
+            (String) -> Unit
     ): ListenerRegistration {
 
-        return db.collection("groups")
+        return db
+            .collection("groups")
+
             .whereArrayContains(
                 "memberIds",
                 currentUserId
             )
-            .addSnapshotListener { snapshot, exception ->
+
+            .addSnapshotListener {
+                    snapshot,
+                    exception ->
 
                 if (exception != null) {
+
                     onError(
                         exception.message
                             ?: "Unable to load groups"
                     )
+
                     return@addSnapshotListener
                 }
 
                 val groups =
-                    snapshot?.documents?.map { document ->
+                    snapshot
+                        ?.documents
+                        ?.map { document ->
 
-                        GroupModel(
-                            id = document.id,
+                            GroupModel(
 
-                            name =
-                                document.getString("name")
-                                    ?: "Unnamed Group",
+                                id =
+                                    document.id,
 
-                            createdBy =
-                                document.getString("createdBy")
-                                    ?: "",
+                                name =
+                                    document
+                                        .getString("name")
+                                        ?: "Unnamed Group",
 
-                            createdAt =
-                                document.getLong("createdAt")
-                                    ?: 0L,
+                                createdBy =
+                                    document
+                                        .getString("createdBy")
+                                        ?: "",
 
-                            memberIds =
-                                (document.get("memberIds")
-                                        as? List<*>)
-                                    ?.filterIsInstance<String>()
-                                    ?: emptyList()
-                        )
+                                createdAt =
+                                    document
+                                        .getLong("createdAt")
+                                        ?: 0L,
 
-                    } ?: emptyList()
+                                memberIds =
+                                    (document
+                                        .get("memberIds")
+                                            as? List<*>)
+                                        ?.filterIsInstance<String>()
+                                        ?: emptyList()
+                            )
+                        }
+                        ?: emptyList()
 
                 onGroupsChanged(
                     groups.sortedByDescending {
@@ -127,6 +179,11 @@ class GroupRepository {
             }
     }
 
+
+
+    // SEND GROUP MESSAGE
+
+
     fun sendGroupMessage(
         groupId: String,
         senderId: String,
@@ -135,10 +192,15 @@ class GroupRepository {
         onError: (String) -> Unit
     ) {
 
-        val cleanText = text.trim()
+        val cleanText =
+            text.trim()
 
         if (cleanText.isEmpty()) {
-            onError("Message cannot be empty")
+
+            onError(
+                "Message cannot be empty"
+            )
+
             return
         }
 
@@ -148,19 +210,34 @@ class GroupRepository {
                 .collection("messages")
                 .document()
 
-        val message = hashMapOf(
-            "senderId" to senderId,
-            "text" to cleanText,
-            "timestamp" to System.currentTimeMillis(),
-            "readBy" to listOf(senderId)
-        )
+
+
+        val message =
+            hashMapOf(
+
+                "senderId" to
+                        senderId,
+
+                "text" to
+                        cleanText,
+
+                "timestamp" to
+                        System.currentTimeMillis(),
+
+                "readBy" to
+                        listOf(senderId)
+            )
 
         messageRef
             .set(message)
+
             .addOnSuccessListener {
+
                 onSuccess()
             }
+
             .addOnFailureListener { exception ->
+
                 onError(
                     exception.message
                         ?: "Unable to send group message"
@@ -168,60 +245,88 @@ class GroupRepository {
             }
     }
 
+
+
+    // LISTEN TO GROUP MESSAGES
+
+
     fun listenToGroupMessages(
         groupId: String,
         onMessagesChanged:
             (List<GroupMessage>) -> Unit,
-        onError: (String) -> Unit
+        onError:
+            (String) -> Unit
     ): ListenerRegistration {
 
-        return db.collection("groups")
+        return db
+            .collection("groups")
             .document(groupId)
             .collection("messages")
+
             .orderBy(
                 "timestamp",
                 Query.Direction.ASCENDING
             )
-            .addSnapshotListener { snapshot, exception ->
+
+            .addSnapshotListener {
+                    snapshot,
+                    exception ->
 
                 if (exception != null) {
+
                     onError(
                         exception.message
                             ?: "Unable to load group messages"
                     )
+
                     return@addSnapshotListener
                 }
 
                 val messages =
-                    snapshot?.documents?.map { document ->
+                    snapshot
+                        ?.documents
+                        ?.map { document ->
 
-                        GroupMessage(
-                            id = document.id,
+                            GroupMessage(
 
-                            senderId =
-                                document.getString("senderId")
-                                    ?: "",
+                                id =
+                                    document.id,
 
-                            text =
-                                document.getString("text")
-                                    ?: "",
+                                senderId =
+                                    document
+                                        .getString("senderId")
+                                        ?: "",
 
-                            timestamp =
-                                document.getLong("timestamp")
-                                    ?: 0L,
+                                text =
+                                    document
+                                        .getString("text")
+                                        ?: "",
 
-                            readBy =
-                                (document.get("readBy")
-                                        as? List<*>)
-                                    ?.filterIsInstance<String>()
-                                    ?: emptyList()
-                        )
+                                timestamp =
+                                    document
+                                        .getLong("timestamp")
+                                        ?: 0L,
 
-                    } ?: emptyList()
+                                readBy =
+                                    (document
+                                        .get("readBy")
+                                            as? List<*>)
+                                        ?.filterIsInstance<String>()
+                                        ?: emptyList()
+                            )
+                        }
+                        ?: emptyList()
 
-                onMessagesChanged(messages)
+                onMessagesChanged(
+                    messages
+                )
             }
     }
+
+
+
+    // MARK GROUP MESSAGE AS READ
+
 
     fun markGroupMessageAsRead(
         groupId: String,
@@ -241,7 +346,8 @@ class GroupRepository {
                 transaction.get(messageRef)
 
             val currentReadBy =
-                (snapshot.get("readBy")
+                (snapshot
+                    .get("readBy")
                         as? List<*>)
                     ?.filterIsInstance<String>()
                     ?: emptyList()

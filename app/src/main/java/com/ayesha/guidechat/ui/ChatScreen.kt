@@ -47,6 +47,13 @@ private val LightMint = Color(0xFFCFFDDC)
 private val Background = Color(0xFFF7FAF7)
 private val DarkText = Color(0xFF253D2C)
 
+// Grey tick = sent/delivered but not read
+private val SentTickColor = Color(0xFF7A847D)
+
+// Blue tick = read
+private val ReadTickColor = Color(0xFF2196F3)
+
+
 data class ChatMessage(
     val id: String = "",
     val senderId: String = "",
@@ -56,6 +63,7 @@ data class ChatMessage(
     val isRead: Boolean = false
 )
 
+
 @Composable
 fun ChatScreen(
     currentUserId: String,
@@ -63,67 +71,106 @@ fun ChatScreen(
     otherUser: UserProfile,
     onBack: () -> Unit
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
 
-    val chatRepository = remember {
-        ChatRepository()
-    }
+    val context =
+        androidx.compose.ui.platform.LocalContext.current
+
+    val chatRepository =
+        remember {
+            ChatRepository()
+        }
 
     var messageText by remember {
         mutableStateOf("")
     }
 
     var messages by remember {
-        mutableStateOf<List<ChatMessage>>(emptyList())
+        mutableStateOf<List<ChatMessage>>(
+            emptyList()
+        )
     }
 
     var errorMessage by remember {
         mutableStateOf<String?>(null)
     }
 
-    // Listen to Firestore messages in real time.
+
+    // LISTEN FOR MESSAGES IN REAL TIME
+
+
     DisposableEffect(
         currentUserId,
         otherUser.uid
     ) {
+
         val listener =
             chatRepository.listenForMessages(
-                currentUserId = currentUserId,
-                otherUserId = otherUser.uid,
+
+                currentUserId =
+                    currentUserId,
+
+                otherUserId =
+                    otherUser.uid,
 
                 onMessagesChanged = { newMessages ->
-                    messages = newMessages
-                    errorMessage = null
+
+                    messages =
+                        newMessages
+
+                    errorMessage =
+                        null
                 },
 
                 onError = { error ->
-                    errorMessage = error
+
+                    errorMessage =
+                        error
                 }
             )
 
         onDispose {
+
             listener.remove()
         }
     }
 
-    // Mark messages received by this user as read.
+
+
+    // MARK RECEIVED MESSAGES AS READ
+
+
     LaunchedEffect(
         currentUserId,
         otherUser.uid,
         messages.size
     ) {
+
         if (messages.isNotEmpty()) {
+
             chatRepository.markMessagesAsRead(
-                currentUserId = currentUserId,
-                otherUserId = otherUser.uid
+
+                currentUserId =
+                    currentUserId,
+
+                otherUserId =
+                    otherUser.uid
             )
         }
     }
 
+
+
+    // MAIN SCREEN
+
+
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Background)
+
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Background
+                )
     ) {
 
 
@@ -131,301 +178,488 @@ fun ChatScreen(
 
 
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color.White)
-                .padding(
-                    horizontal = 8.dp,
-                    vertical = 10.dp
-                ),
 
-            verticalAlignment = Alignment.CenterVertically
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Color.White
+                    )
+                    .padding(
+                        horizontal = 8.dp,
+                        vertical = 10.dp
+                    ),
+
+            verticalAlignment =
+                Alignment.CenterVertically
         ) {
+
+
+            // BACK BUTTON
 
             IconButton(
                 onClick = onBack
             ) {
+
                 Icon(
-                    imageVector = Icons.Default.ArrowBack,
-                    contentDescription = "Back",
-                    tint = DarkGreen
+
+                    imageVector =
+                        Icons.Default.ArrowBack,
+
+                    contentDescription =
+                        "Back",
+
+                    tint =
+                        DarkGreen
                 )
             }
+
+
+            // USER AVATAR
 
             Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .clip(CircleShape)
-                    .background(LightMint),
 
-                contentAlignment = Alignment.Center
+                modifier =
+                    Modifier
+                        .size(44.dp)
+                        .clip(
+                            CircleShape
+                        )
+                        .background(
+                            LightMint
+                        ),
+
+                contentAlignment =
+                    Alignment.Center
             ) {
-                Text(
-                    text = otherUser.name
-                        .firstOrNull()
-                        ?.uppercase()
-                        ?: "?",
 
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = DarkGreen
+                Text(
+
+                    text =
+                        otherUser.name
+                            .firstOrNull()
+                            ?.uppercase()
+                            ?: "?",
+
+                    fontSize =
+                        17.sp,
+
+                    fontWeight =
+                        FontWeight.Bold,
+
+                    color =
+                        DarkGreen
                 )
             }
 
+
             Spacer(
-                modifier = Modifier.size(12.dp)
+                modifier =
+                    Modifier.size(12.dp)
             )
 
-            Column(
-                modifier = Modifier.weight(1f)
-            ) {
-                Text(
-                    text = otherUser.name.ifBlank {
-                        "User"
-                    },
 
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = DarkText
+            // USER INFORMATION
+
+            Column(
+                modifier =
+                    Modifier.weight(1f)
+            ) {
+
+                Text(
+
+                    text =
+                        otherUser.name.ifBlank {
+                            "User"
+                        },
+
+                    fontSize =
+                        17.sp,
+
+                    fontWeight =
+                        FontWeight.Bold,
+
+                    color =
+                        DarkText
                 )
 
                 Spacer(
-                    modifier = Modifier.height(2.dp)
+                    modifier =
+                        Modifier.height(2.dp)
                 )
 
                 Text(
-                    text = otherUser.role.ifBlank {
-                        "User"
-                    },
 
-                    fontSize = 12.sp,
-                    color = DarkGreen
+                    text =
+                        otherUser.role.ifBlank {
+                            "User"
+                        },
+
+                    fontSize =
+                        12.sp,
+
+                    color =
+                        DarkGreen
                 )
             }
 
+
+            // MORE OPTIONS
+
             IconButton(
+
                 onClick = {
-                    // Chat options will be added later.
+                    // Chat options can be added later.
                 }
             ) {
+
                 Icon(
-                    imageVector = Icons.Default.MoreVert,
-                    contentDescription = "Chat options",
-                    tint = DarkText
+
+                    imageVector =
+                        Icons.Default.MoreVert,
+
+                    contentDescription =
+                        "Chat options",
+
+                    tint =
+                        DarkText
                 )
             }
         }
 
 
-        // ERROR
+
+        // ERROR MESSAGE
+
 
         if (errorMessage != null) {
 
             Text(
-                text = errorMessage ?: "",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(
-                        Color(0xFFFFE8E8)
-                    )
-                    .padding(10.dp),
 
-                color = Color(0xFFB3261E),
-                fontSize = 13.sp
+                text =
+                    errorMessage ?: "",
+
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .background(
+                            Color(0xFFFFE8E8)
+                        )
+                        .padding(
+                            10.dp
+                        ),
+
+                color =
+                    Color(0xFFB3261E),
+
+                fontSize =
+                    13.sp
             )
         }
 
-        // MESSAGES
+
+
+        // MESSAGE AREA
+
 
         if (messages.isEmpty()) {
 
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
 
-                contentAlignment = Alignment.Center
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+
+                contentAlignment =
+                    Alignment.Center
             ) {
 
                 Column(
+
                     horizontalAlignment =
                         Alignment.CenterHorizontally
                 ) {
 
+
+                    // BIG AVATAR
+
                     Box(
-                        modifier = Modifier
-                            .size(90.dp)
-                            .clip(CircleShape)
-                            .background(LightMint),
+
+                        modifier =
+                            Modifier
+                                .size(90.dp)
+                                .clip(
+                                    CircleShape
+                                )
+                                .background(
+                                    LightMint
+                                ),
 
                         contentAlignment =
                             Alignment.Center
                     ) {
 
                         Text(
-                            text = otherUser.name
-                                .firstOrNull()
-                                ?.uppercase()
-                                ?: "?",
 
-                            fontSize = 32.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = DarkGreen
+                            text =
+                                otherUser.name
+                                    .firstOrNull()
+                                    ?.uppercase()
+                                    ?: "?",
+
+                            fontSize =
+                                32.sp,
+
+                            fontWeight =
+                                FontWeight.Bold,
+
+                            color =
+                                DarkGreen
                         )
                     }
 
-                    Spacer(
-                        modifier = Modifier.height(18.dp)
-                    )
-
-                    Text(
-                        text = "Start a conversation",
-
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = DarkText
-                    )
 
                     Spacer(
-                        modifier = Modifier.height(6.dp)
+                        modifier =
+                            Modifier.height(18.dp)
                     )
 
+
                     Text(
+
+                        text =
+                            "Start a conversation",
+
+                        fontSize =
+                            20.sp,
+
+                        fontWeight =
+                            FontWeight.Bold,
+
+                        color =
+                            DarkText
+                    )
+
+
+                    Spacer(
+                        modifier =
+                            Modifier.height(6.dp)
+                    )
+
+
+                    Text(
+
                         text =
                             "Send a message to ${otherUser.name}",
 
-                        fontSize = 14.sp,
-                        color = Color.Gray
+                        fontSize =
+                            14.sp,
+
+                        color =
+                            Color.Gray
                     )
                 }
             }
 
         } else {
 
+
+
+            // MESSAGE LIST
+
+
             LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .padding(
-                        horizontal = 16.dp,
-                        vertical = 12.dp
-                    ),
+
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(
+                            horizontal = 16.dp,
+                            vertical = 12.dp
+                        ),
 
                 verticalArrangement =
                     Arrangement.spacedBy(8.dp),
 
-                reverseLayout = false
+                reverseLayout =
+                    false
             ) {
 
                 items(
-                    items = messages,
+
+                    items =
+                        messages,
+
                     key = { message ->
                         message.id
                     }
+
                 ) { message ->
 
+
                     MessageBubble(
-                        message = message,
-                        currentUserId = currentUserId
+
+                        message =
+                            message,
+
+                        currentUserId =
+                            currentUserId
                     )
                 }
             }
         }
 
 
+
         // MESSAGE INPUT
 
 
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(Color.White)
-                .padding(
-                    horizontal = 12.dp,
-                    vertical = 10.dp
-                ),
 
-            verticalAlignment = Alignment.CenterVertically
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Color.White
+                    )
+                    .padding(
+                        horizontal = 12.dp,
+                        vertical = 10.dp
+                    ),
+
+            verticalAlignment =
+                Alignment.CenterVertically
         ) {
 
+
+            // TEXT FIELD
+
             OutlinedTextField(
-                value = messageText,
+
+                value =
+                    messageText,
 
                 onValueChange = {
                     messageText = it
                 },
 
-                modifier = Modifier.weight(1f),
+                modifier =
+                    Modifier.weight(1f),
 
                 placeholder = {
-                    Text("Type a message...")
+                    Text(
+                        "Type a message..."
+                    )
                 },
 
-                singleLine = true,
+                singleLine =
+                    true,
 
-                shape = RoundedCornerShape(24.dp)
+                shape =
+                    RoundedCornerShape(
+                        24.dp
+                    )
             )
+
 
             Spacer(
-                modifier = Modifier.size(8.dp)
+                modifier =
+                    Modifier.size(8.dp)
             )
 
+
+            // SEND BUTTON
+
             IconButton(
+
                 onClick = {
 
                     val textToSend =
                         messageText.trim()
 
-                    if (textToSend.isEmpty()) {
+                    if (
+                        textToSend.isEmpty()
+                    ) {
+
                         return@IconButton
                     }
 
+
                     chatRepository.sendMessage(
-                        senderId = currentUserId,
-                        receiverId = otherUser.uid,
-                        text = textToSend,
+
+                        senderId =
+                            currentUserId,
+
+                        receiverId =
+                            otherUser.uid,
+
+                        text =
+                            textToSend,
 
                         onSuccess = {
-                            messageText = ""
+
+                            messageText =
+                                ""
                         },
 
                         onError = { error ->
 
                             Toast.makeText(
+
                                 context,
+
                                 error,
+
                                 Toast.LENGTH_LONG
+
                             ).show()
                         }
                     )
                 },
 
-                enabled = messageText.isNotBlank()
+                enabled =
+                    messageText.isNotBlank()
             ) {
 
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(
-                            if (messageText.isNotBlank()) {
-                                DarkGreen
-                            } else {
-                                Color.LightGray
-                            }
-                        ),
 
-                    contentAlignment = Alignment.Center
+                Box(
+
+                    modifier =
+                        Modifier
+                            .size(48.dp)
+                            .clip(
+                                CircleShape
+                            )
+                            .background(
+
+                                if (
+                                    messageText.isNotBlank()
+                                ) {
+                                    DarkGreen
+                                } else {
+                                    Color.LightGray
+                                }
+                            ),
+
+                    contentAlignment =
+                        Alignment.Center
                 ) {
 
                     Icon(
-                        imageVector = Icons.Default.Send,
 
-                        contentDescription = "Send",
+                        imageVector =
+                            Icons.Default.Send,
 
-                        tint = Color.White,
+                        contentDescription =
+                            "Send",
 
-                        modifier = Modifier.size(21.dp)
+                        tint =
+                            Color.White,
+
+                        modifier =
+                            Modifier.size(21.dp)
                     )
                 }
             }
@@ -433,94 +667,212 @@ fun ChatScreen(
     }
 }
 
+
+
+// MESSAGE BUBBLE
+
+
 @Composable
 private fun MessageBubble(
+
     message: ChatMessage,
+
     currentUserId: String
 ) {
 
     val isMine =
-        message.senderId == currentUserId
+        message.senderId ==
+                currentUserId
+
 
     Row(
-        modifier = Modifier.fillMaxWidth(),
+
+        modifier =
+            Modifier.fillMaxWidth(),
 
         horizontalArrangement =
             if (isMine) {
+
                 Arrangement.End
+
             } else {
+
                 Arrangement.Start
             }
     ) {
 
+
         Column(
+
             horizontalAlignment =
                 if (isMine) {
+
                     Alignment.End
+
                 } else {
+
                     Alignment.Start
                 }
         ) {
 
+
+
+            // MESSAGE BUBBLE
+
+
             Box(
-                modifier = Modifier
-                    .clip(
-                        RoundedCornerShape(
-                            topStart = 18.dp,
-                            topEnd = 18.dp,
-                            bottomStart =
-                                if (isMine) 18.dp else 4.dp,
-                            bottomEnd =
-                                if (isMine) 4.dp else 18.dp
+
+                modifier =
+                    Modifier
+                        .clip(
+
+                            RoundedCornerShape(
+
+                                topStart =
+                                    18.dp,
+
+                                topEnd =
+                                    18.dp,
+
+                                bottomStart =
+                                    if (isMine) {
+                                        18.dp
+                                    } else {
+                                        4.dp
+                                    },
+
+                                bottomEnd =
+                                    if (isMine) {
+                                        4.dp
+                                    } else {
+                                        18.dp
+                                    }
+                            )
                         )
-                    )
-                    .background(
-                        if (isMine) {
-                            LightMint
-                        } else {
-                            Color.White
-                        }
-                    )
-                    .padding(
-                        horizontal = 15.dp,
-                        vertical = 10.dp
-                    )
+
+                        .background(
+
+                            if (isMine) {
+
+                                LightMint
+
+                            } else {
+
+                                Color.White
+                            }
+                        )
+
+                        .padding(
+
+                            horizontal =
+                                15.dp,
+
+                            vertical =
+                                10.dp
+                        )
             ) {
 
                 Text(
-                    text = message.text,
-                    fontSize = 15.sp,
-                    color = DarkText
+
+                    text =
+                        message.text,
+
+                    fontSize =
+                        15.sp,
+
+                    color =
+                        DarkText
                 )
             }
 
-            if (isMine && message.isRead) {
+
+
+
+            if (isMine) {
 
                 Row(
+
                     verticalAlignment =
                         Alignment.CenterVertically,
 
-                    modifier = Modifier.padding(
-                        top = 2.dp,
-                        end = 4.dp
-                    )
+                    modifier =
+                        Modifier.padding(
+
+                            top =
+                                2.dp,
+
+                            end =
+                                4.dp
+                        )
                 ) {
 
-                    Icon(
-                        imageVector = Icons.Default.Done,
-                        contentDescription = "Read",
-                        modifier = Modifier.size(13.dp),
-                        tint = DarkGreen
-                    )
 
-                    Icon(
-                        imageVector = Icons.Default.Done,
-                        contentDescription = "Read",
-                        modifier = Modifier
-                            .size(13.dp)
-                            .padding(start = 0.dp),
-                        tint = DarkGreen
-                    )
+                    if (message.isRead) {
+
+
+                        // BLUE DOUBLE TICK
+
+
+                        Icon(
+
+                            imageVector =
+                                Icons.Default.Done,
+
+                            contentDescription =
+                                "Read",
+
+                            modifier =
+                                Modifier.size(
+                                    13.dp
+                                ),
+
+                            tint =
+                                ReadTickColor
+                        )
+
+                        Icon(
+
+                            imageVector =
+                                Icons.Default.Done,
+
+                            contentDescription =
+                                "Read",
+
+                            modifier =
+                                Modifier
+                                    .size(
+                                        13.dp
+                                    )
+                                    .padding(
+                                        start = 0.dp
+                                    ),
+
+                            tint =
+                                ReadTickColor
+                        )
+
+                    } else {
+
+
+                        // SINGLE GREY TICK
+
+                        Icon(
+
+                            imageVector =
+                                Icons.Default.Done,
+
+                            contentDescription =
+                                "Sent",
+
+                            modifier =
+                                Modifier.size(
+                                    13.dp
+                                ),
+
+                            tint =
+                                SentTickColor
+                        )
+                    }
                 }
             }
         }

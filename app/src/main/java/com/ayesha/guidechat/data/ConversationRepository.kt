@@ -3,7 +3,6 @@ package com.ayesha.guidechat.data
 import com.ayesha.guidechat.ui.ChatPreview
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
-import com.google.firebase.firestore.Query
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -42,7 +41,8 @@ class ConversationRepository {
                 }
 
                 val documents =
-                    snapshot?.documents ?: emptyList()
+                    snapshot?.documents
+                        ?: emptyList()
 
                 if (documents.isEmpty()) {
 
@@ -80,6 +80,7 @@ class ConversationRepository {
                             completed ==
                             documents.size
                         ) {
+
                             publish(
                                 previews,
                                 onConversationsChanged
@@ -89,6 +90,9 @@ class ConversationRepository {
                         return@forEach
                     }
 
+                    /*
+                     * Get the other user's profile.
+                     */
                     db.collection("users")
                         .document(otherUserId)
                         .get()
@@ -116,45 +120,124 @@ class ConversationRepository {
                                     )
                                     ?: 0L
 
-                            previews[otherUserId] =
-                                ChatPreview(
-                                    userId =
-                                        otherUserId,
-
-                                    name =
-                                        name,
-
-                                    message =
-                                        lastMessage,
-
-                                    time =
-                                        formatTime(timestamp),
-
-                                    unreadCount = 0,
-
-                                    isOnline =
-                                        isOnline,
-
-                                    timestamp =
-                                        timestamp,
-
-                                    isGroup = false
+                            /*
+                             * Count unread messages.
+                             *
+                             * We only count messages:
+                             * - sent by the other user
+                             * - received by current user
+                             * - not read yet
+                             */
+                            db.collection("conversations")
+                                .document(document.id)
+                                .collection("messages")
+                                .whereEqualTo(
+                                    "receiverId",
+                                    currentUserId
                                 )
-
-                            completed++
-
-                            if (
-                                completed ==
-                                documents.size
-                            ) {
-
-                                publish(
-                                    previews,
-                                    onConversationsChanged
+                                .whereEqualTo(
+                                    "read",
+                                    false
                                 )
-                            }
+                                .get()
+                                .addOnSuccessListener { unreadSnapshot ->
+
+                                    val unreadCount =
+                                        unreadSnapshot.size()
+
+                                    previews[otherUserId] =
+                                        ChatPreview(
+
+                                            userId =
+                                                otherUserId,
+
+                                            name =
+                                                name,
+
+                                            message =
+                                                lastMessage,
+
+                                            time =
+                                                formatTime(
+                                                    timestamp
+                                                ),
+
+                                            unreadCount =
+                                                unreadCount,
+
+                                            isOnline =
+                                                isOnline,
+
+                                            timestamp =
+                                                timestamp,
+
+                                            isGroup =
+                                                false
+                                        )
+
+                                    completed++
+
+                                    if (
+                                        completed ==
+                                        documents.size
+                                    ) {
+
+                                        publish(
+                                            previews,
+                                            onConversationsChanged
+                                        )
+                                    }
+                                }
+                                .addOnFailureListener { error ->
+
+                                    /*
+                                     * If unread count fails,
+                                     * still show the conversation.
+                                     */
+                                    previews[otherUserId] =
+                                        ChatPreview(
+
+                                            userId =
+                                                otherUserId,
+
+                                            name =
+                                                name,
+
+                                            message =
+                                                lastMessage,
+
+                                            time =
+                                                formatTime(
+                                                    timestamp
+                                                ),
+
+                                            unreadCount =
+                                                0,
+
+                                            isOnline =
+                                                isOnline,
+
+                                            timestamp =
+                                                timestamp,
+
+                                            isGroup =
+                                                false
+                                        )
+
+                                    completed++
+
+                                    if (
+                                        completed ==
+                                        documents.size
+                                    ) {
+
+                                        publish(
+                                            previews,
+                                            onConversationsChanged
+                                        )
+                                    }
+                                }
                         }
-
                         .addOnFailureListener { error ->
 
                             completed++
@@ -179,8 +262,14 @@ class ConversationRepository {
             }
     }
 
+    /*
+     * Publish conversations sorted
+     * by newest message.
+     */
     private fun publish(
-        previews: Map<String, ChatPreview>,
+        previews:
+        Map<String, ChatPreview>,
+
         onConversationsChanged:
             (List<ChatPreview>) -> Unit
     ) {
@@ -191,9 +280,14 @@ class ConversationRepository {
                     it.timestamp
                 }
 
-        onConversationsChanged(result)
+        onConversationsChanged(
+            result
+        )
     }
 
+    /*
+     * Format message timestamp.
+     */
     private fun formatTime(
         timestamp: Long
     ): String {
@@ -217,7 +311,9 @@ class ConversationRepository {
                 Locale.getDefault()
             ).format(messageDate)
 
-        return if (today == messageDay) {
+        return if (
+            today == messageDay
+        ) {
 
             SimpleDateFormat(
                 "hh:mm a",
