@@ -12,10 +12,7 @@ class ConversationRepository {
     private val db =
         FirebaseFirestore.getInstance()
 
-    /*
-     * Listen to all one-to-one conversations
-     * belonging to the currently logged-in user.
-     */
+
     fun listenForConversations(
         currentUserId: String,
         onConversationsChanged:
@@ -120,14 +117,7 @@ class ConversationRepository {
                                     )
                                     ?: 0L
 
-                            /*
-                             * Count unread messages.
-                             *
-                             * We only count messages:
-                             * - sent by the other user
-                             * - received by current user
-                             * - not read yet
-                             */
+
                             db.collection("conversations")
                                 .document(document.id)
                                 .collection("messages")
@@ -262,10 +252,7 @@ class ConversationRepository {
             }
     }
 
-    /*
-     * Publish conversations sorted
-     * by newest message.
-     */
+
     private fun publish(
         previews:
         Map<String, ChatPreview>,

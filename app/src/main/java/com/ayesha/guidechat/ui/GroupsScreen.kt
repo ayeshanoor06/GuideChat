@@ -109,9 +109,8 @@ fun GroupsScreen(
             modifier = Modifier.fillMaxSize()
         ) {
 
-            // =================================================
+
             // TOP BAR
-            // =================================================
 
             Row(
                 modifier = Modifier
@@ -156,9 +155,9 @@ fun GroupsScreen(
                 )
             }
 
-            // =================================================
+
             // SEARCH
-            // =================================================
+
 
             OutlinedTextField(
                 value = searchText,
@@ -197,9 +196,9 @@ fun GroupsScreen(
                     RoundedCornerShape(16.dp)
             )
 
-            // =================================================
+
             // GROUP LIST
-            // =================================================
+
 
             when {
 
@@ -334,9 +333,9 @@ fun GroupsScreen(
             }
         }
 
-        // =====================================================
+
         // CREATE GROUP BUTTON
-        // =====================================================
+
 
         FloatingActionButton(
             onClick = onCreateGroup,

@@ -101,9 +101,9 @@ fun HomeScreen(
                 containerColor = Color.White
             ) {
 
-                // =================================================
+
                 // CHATS TAB
-                // =================================================
+
 
                 NavigationBarItem(
                     selected = selectedBottomItem == 0,
@@ -129,9 +129,8 @@ fun HomeScreen(
                     }
                 )
 
-                // =================================================
-                // GROUPS TAB
-                // =================================================
+                 // GROUPS TAB
+
 
                 NavigationBarItem(
                     selected = selectedBottomItem == 1,
@@ -161,9 +160,9 @@ fun HomeScreen(
                     }
                 )
 
-                // =================================================
+
                 // PROFILE TAB
-                // =================================================
+
 
                 NavigationBarItem(
                     selected = selectedBottomItem == 2,
@@ -191,9 +190,9 @@ fun HomeScreen(
             }
         },
 
-        // =====================================================
+
         // NEW CHAT BUTTON
-        // =====================================================
+
 
         floatingActionButton = {
 
@@ -230,9 +229,9 @@ fun HomeScreen(
                 modifier = Modifier.height(24.dp)
             )
 
-            // =================================================
+
             // HEADER
-            // =================================================
+
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -299,9 +298,9 @@ fun HomeScreen(
                 modifier = Modifier.height(22.dp)
             )
 
-            // =================================================
+
             // SEARCH
-            // =================================================
+
 
             TextField(
 
@@ -363,9 +362,9 @@ fun HomeScreen(
                 modifier = Modifier.height(26.dp)
             )
 
-            // =================================================
+
             // MESSAGES HEADER
-            // =================================================
+
 
             Row(
                 modifier = Modifier.fillMaxWidth(),

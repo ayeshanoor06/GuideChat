@@ -1,4 +1,3 @@
-
 package com.ayesha.guidechat.data
 
 import com.ayesha.guidechat.ui.ChatMessage
@@ -12,9 +11,9 @@ class ChatRepository {
         FirebaseFirestore.getInstance()
 
 
-    // =========================================================
+
     // CREATE CONSISTENT ONE-TO-ONE CONVERSATION ID
-    // =========================================================
+
 
     private fun conversationId(
         userId1: String,
@@ -30,9 +29,9 @@ class ChatRepository {
     }
 
 
-    // =========================================================
+
     // SEND MESSAGE
-    // =========================================================
+
 
     fun sendMessage(
         senderId: String,
@@ -72,11 +71,6 @@ class ChatRepository {
         val timestamp =
             System.currentTimeMillis()
 
-
-        // =====================================================
-        // MESSAGE DATA
-        // =====================================================
-
         val message =
             hashMapOf(
 
@@ -95,11 +89,6 @@ class ChatRepository {
                 "read" to
                         false
             )
-
-
-        // =====================================================
-        // CONVERSATION DATA
-        // =====================================================
 
         val conversation =
             hashMapOf(
@@ -120,11 +109,6 @@ class ChatRepository {
                         timestamp
             )
 
-
-        // =====================================================
-        // CREATE CONVERSATION + MESSAGE
-        // =====================================================
-
         db.runBatch { batch ->
 
             batch.set(
@@ -137,18 +121,10 @@ class ChatRepository {
                 message
             )
         }
-
             .addOnSuccessListener {
-
-                // Stop typing after message is sent.
-                clearTypingStatus(
-                    senderId,
-                    receiverId
-                )
 
                 onSuccess()
             }
-
             .addOnFailureListener { exception ->
 
                 onError(
@@ -159,9 +135,9 @@ class ChatRepository {
     }
 
 
-    // =========================================================
-    // LISTEN TO ONE-TO-ONE MESSAGES
-    // =========================================================
+
+    // REAL-TIME MESSAGE LISTENER
+
 
     fun listenForMessages(
         currentUserId: String,
@@ -181,13 +157,12 @@ class ChatRepository {
         return db.collection("conversations")
             .document(id)
             .collection("messages")
-
             .orderBy(
                 "timestamp",
                 Query.Direction.ASCENDING
             )
-
             .addSnapshotListener {
+
                     snapshot,
                     exception ->
 
@@ -212,53 +187,150 @@ class ChatRepository {
                                     document.id,
 
                                 senderId =
-                                    document
-                                        .getString(
-                                            "senderId"
-                                        )
-                                        ?: "",
+                                    document.getString(
+                                        "senderId"
+                                    ) ?: "",
 
                                 receiverId =
-                                    document
-                                        .getString(
-                                            "receiverId"
-                                        )
-                                        ?: "",
+                                    document.getString(
+                                        "receiverId"
+                                    ) ?: "",
 
                                 text =
-                                    document
-                                        .getString(
-                                            "text"
-                                        )
-                                        ?: "",
+                                    document.getString(
+                                        "text"
+                                    ) ?: "",
 
                                 timestamp =
-                                    document
-                                        .getLong(
-                                            "timestamp"
-                                        )
-                                        ?: 0L,
+                                    document.getLong(
+                                        "timestamp"
+                                    ) ?: 0L,
 
                                 isRead =
-                                    document
-                                        .getBoolean(
-                                            "read"
-                                        )
-                                        ?: false
+                                    document.getBoolean(
+                                        "read"
+                                    ) ?: false
                             )
                         }
                         ?: emptyList()
 
-                onMessagesChanged(
-                    messages
-                )
+                // This is called automatically whenever
+                // Firestore data changes.
+                onMessagesChanged(messages)
             }
     }
 
 
-    // =========================================================
-    // MARK RECEIVED ONE-TO-ONE MESSAGES AS READ
-    // =========================================================
+
+    // REAL-TIME TYPING LISTENER
+
+    // Returns true when the OTHER USER is  .
+
+
+    fun listenForTyping(
+        currentUserId: String,
+        otherUserId: String,
+        onTypingChanged:
+            (Boolean) -> Unit,
+        onError:
+            (String) -> Unit
+    ): ListenerRegistration {
+
+        val id =
+            conversationId(
+                currentUserId,
+                otherUserId
+            )
+
+        return db.collection("conversations")
+            .document(id)
+            .collection("typing")
+            .document(otherUserId)
+            .addSnapshotListener {
+
+                    snapshot,
+                    exception ->
+
+                if (exception != null) {
+
+                    onError(
+                        exception.message
+                            ?: "Unable to listen for typing"
+                    )
+
+                    return@addSnapshotListener
+                }
+
+                val isTyping =
+                    snapshot
+                        ?.getBoolean("isTyping")
+                        ?: false
+
+                onTypingChanged(isTyping)
+            }
+    }
+
+
+
+    // SET TYPING STATUS
+
+
+    fun setTyping(
+        currentUserId: String,
+        otherUserId: String,
+        isTyping: Boolean
+    ) {
+
+        val id =
+            conversationId(
+                currentUserId,
+                otherUserId
+            )
+
+        val typingRef =
+            db.collection("conversations")
+                .document(id)
+                .collection("typing")
+                .document(currentUserId)
+
+        val data =
+            hashMapOf(
+
+                "userId" to
+                        currentUserId,
+
+                "isTyping" to
+                        isTyping,
+
+                "timestamp" to
+                        System.currentTimeMillis()
+            )
+
+        typingRef
+            .set(data)
+    }
+
+
+
+    // CLEAR TYPING STATUS
+
+
+    fun clearTypingStatus(
+        currentUserId: String,
+        otherUserId: String
+    ) {
+
+        setTyping(
+            currentUserId = currentUserId,
+            otherUserId = otherUserId,
+            isTyping = false
+        )
+    }
+
+
+
+    // MARK RECEIVED MESSAGES AS READ
+
 
     fun markMessagesAsRead(
         currentUserId: String,
@@ -286,7 +358,6 @@ class ChatRepository {
                 false
             )
             .get()
-
             .addOnSuccessListener { snapshot ->
 
                 if (snapshot.isEmpty) {
@@ -307,149 +378,5 @@ class ChatRepository {
 
                 batch.commit()
             }
-    }
-
-
-    // =========================================================
-    // SET ONE-TO-ONE TYPING STATUS
-    // =========================================================
-    //
-    // Firestore structure:
-    //
-    // conversations/{conversationId}/typing/{userId}
-    //
-    // =========================================================
-
-    fun setTyping(
-        currentUserId: String,
-        otherUserId: String,
-        isTyping: Boolean
-    ) {
-
-        val id =
-            conversationId(
-                currentUserId,
-                otherUserId
-            )
-
-        val typingRef =
-            db.collection("conversations")
-                .document(id)
-                .collection("typing")
-                .document(currentUserId)
-
-        val typingData =
-            hashMapOf(
-
-                "isTyping" to
-                        isTyping,
-
-                "timestamp" to
-                        System.currentTimeMillis()
-            )
-
-        typingRef
-            .set(typingData)
-    }
-
-
-    // =========================================================
-    // CLEAR ONE-TO-ONE TYPING STATUS
-    // =========================================================
-    //
-    // This is the function your ChatScreen.kt currently needs.
-    //
-    // =========================================================
-
-    fun clearTypingStatus(
-        currentUserId: String,
-        otherUserId: String
-    ) {
-
-        val id =
-            conversationId(
-                currentUserId,
-                otherUserId
-            )
-
-        db.collection("conversations")
-            .document(id)
-            .collection("typing")
-            .document(currentUserId)
-            .delete()
-    }
-
-
-    // =========================================================
-    // LISTEN TO OTHER USER TYPING STATUS
-    // =========================================================
-
-    fun listenForTyping(
-        currentUserId: String,
-        otherUserId: String,
-        onTypingChanged:
-            (Boolean) -> Unit,
-        onError:
-            (String) -> Unit
-    ): ListenerRegistration {
-
-        val id =
-            conversationId(
-                currentUserId,
-                otherUserId
-            )
-
-        return db.collection("conversations")
-            .document(id)
-            .collection("typing")
-            .document(otherUserId)
-
-            .addSnapshotListener {
-                    snapshot,
-                    exception ->
-
-                if (exception != null) {
-
-                    onError(
-                        exception.message
-                            ?: "Unable to load typing status"
-                    )
-
-                    return@addSnapshotListener
-                }
-
-                val isTyping =
-                    snapshot
-                        ?.getBoolean(
-                            "isTyping"
-                        )
-                        ?: false
-
-                onTypingChanged(
-                    isTyping
-                )
-            }
-    }
-
-
-    // =========================================================
-    // COMPATIBILITY ALIAS
-    // =========================================================
-
-    fun listenToTyping(
-        currentUserId: String,
-        otherUserId: String,
-        onTypingChanged:
-            (Boolean) -> Unit,
-        onError:
-            (String) -> Unit
-    ): ListenerRegistration {
-
-        return listenForTyping(
-            currentUserId = currentUserId,
-            otherUserId = otherUserId,
-            onTypingChanged = onTypingChanged,
-            onError = onError
-        )
     }
 }

@@ -7,9 +7,9 @@ class UserRepository {
 
     private val db = FirebaseFirestore.getInstance()
 
-    // =========================================================
+
     // CREATE USER PROFILE
-    // =========================================================
+
 
     fun createUserProfile(
         userProfile: UserProfile,
@@ -36,9 +36,9 @@ class UserRepository {
             }
     }
 
-    // =========================================================
+
     // GET CURRENT USER PROFILE
-    // =========================================================
+
 
     fun getUserProfile(
         uid: String,
@@ -97,19 +97,10 @@ class UserRepository {
             }
     }
 
-    // =========================================================
+
     // GET ALL USERS
-    // =========================================================
-    //
-    // Used by GroupCreateScreen.
-    //
-    // This loads the real users stored in:
-    //
-    // Firebase Firestore
-    //      └── users
-    //
-    // The currently logged-in user is removed from the list.
-    // =========================================================
+
+
 
     fun getAllUsers(
         onSuccess: (List<UserProfile>) -> Unit,
@@ -187,9 +178,9 @@ class UserRepository {
             }
     }
 
-    // =========================================================
+
     // SEARCH USERS
-    // =========================================================
+
 
     fun searchUsers(
         searchText: String,

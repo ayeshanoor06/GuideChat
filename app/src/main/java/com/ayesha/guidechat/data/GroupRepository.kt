@@ -1,25 +1,47 @@
-
 package com.ayesha.guidechat.data
 
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 
+
+// =============================================================
+// GROUP MODEL
+// =============================================================
+
 data class GroupModel(
+
     val id: String = "",
+
     val name: String = "",
+
     val createdBy: String = "",
+
     val createdAt: Long = 0L,
-    val memberIds: List<String> = emptyList()
+
+    val memberIds: List<String> =
+        emptyList()
 )
 
+
+// =============================================================
+// GROUP MESSAGE MODEL
+// =============================================================
+
 data class GroupMessage(
+
     val id: String = "",
+
     val senderId: String = "",
+
     val text: String = "",
+
     val timestamp: Long = 0L,
-    val readBy: List<String> = emptyList()
+
+    val readBy: List<String> =
+        emptyList()
 )
+
 
 class GroupRepository {
 
@@ -27,7 +49,8 @@ class GroupRepository {
         FirebaseFirestore.getInstance()
 
 
-     // CREATE GROUP
+
+    // CREATE GROUP
 
 
     fun createGroup(
@@ -102,7 +125,7 @@ class GroupRepository {
 
 
 
-    // LISTEN TO GROUPS
+    // REAL-TIME GROUP LISTENER
 
 
     fun listenToGroups(
@@ -114,13 +137,12 @@ class GroupRepository {
     ): ListenerRegistration {
 
         return db.collection("groups")
-
             .whereArrayContains(
                 "memberIds",
                 currentUserId
             )
-
             .addSnapshotListener {
+
                     snapshot,
                     exception ->
 
@@ -145,24 +167,29 @@ class GroupRepository {
                                     document.id,
 
                                 name =
-                                    document
-                                        .getString("name")
+                                    document.getString(
+                                        "name"
+                                    )
                                         ?: "Unnamed Group",
 
                                 createdBy =
-                                    document
-                                        .getString("createdBy")
+                                    document.getString(
+                                        "createdBy"
+                                    )
                                         ?: "",
 
                                 createdAt =
-                                    document
-                                        .getLong("createdAt")
+                                    document.getLong(
+                                        "createdAt"
+                                    )
                                         ?: 0L,
 
                                 memberIds =
-                                    (document
-                                        .get("memberIds")
-                                            as? List<*>)
+                                    (
+                                            document.get(
+                                                "memberIds"
+                                            ) as? List<*>
+                                            )
                                         ?.filterIsInstance<String>()
                                         ?: emptyList()
                             )
@@ -223,28 +250,17 @@ class GroupRepository {
                 "timestamp" to
                         timestamp,
 
-                // Sender has already seen
-                // their own message.
+                // Sender has already seen their own message.
                 "readBy" to
                         listOf(senderId)
             )
 
         messageRef
             .set(message)
-
             .addOnSuccessListener {
-
-                // Automatically stop typing
-                // after sending a message.
-                setTyping(
-                    groupId = groupId,
-                    userId = senderId,
-                    isTyping = false
-                )
 
                 onSuccess()
             }
-
             .addOnFailureListener { exception ->
 
                 onError(
@@ -256,7 +272,7 @@ class GroupRepository {
 
 
 
-    // LISTEN TO GROUP MESSAGES
+    // REAL-TIME GROUP MESSAGE LISTENER
 
 
     fun listenToGroupMessages(
@@ -270,13 +286,12 @@ class GroupRepository {
         return db.collection("groups")
             .document(groupId)
             .collection("messages")
-
             .orderBy(
                 "timestamp",
                 Query.Direction.ASCENDING
             )
-
             .addSnapshotListener {
+
                     snapshot,
                     exception ->
 
@@ -301,33 +316,37 @@ class GroupRepository {
                                     document.id,
 
                                 senderId =
-                                    document
-                                        .getString("senderId")
+                                    document.getString(
+                                        "senderId"
+                                    )
                                         ?: "",
 
                                 text =
-                                    document
-                                        .getString("text")
+                                    document.getString(
+                                        "text"
+                                    )
                                         ?: "",
 
                                 timestamp =
-                                    document
-                                        .getLong("timestamp")
+                                    document.getLong(
+                                        "timestamp"
+                                    )
                                         ?: 0L,
 
                                 readBy =
-                                    (document
-                                        .get("readBy")
-                                            as? List<*>)
+                                    (
+                                            document.get(
+                                                "readBy"
+                                            ) as? List<*>
+                                            )
                                         ?.filterIsInstance<String>()
                                         ?: emptyList()
                             )
                         }
                         ?: emptyList()
 
-                onMessagesChanged(
-                    messages
-                )
+
+                onMessagesChanged(messages)
             }
     }
 
@@ -351,17 +370,22 @@ class GroupRepository {
         db.runTransaction { transaction ->
 
             val snapshot =
-                transaction.get(
-                    messageRef
-                )
+                transaction.get(messageRef)
 
             val currentReadBy =
-                (snapshot.get("readBy")
-                        as? List<*>)
+                (
+                        snapshot.get(
+                            "readBy"
+                        ) as? List<*>
+                        )
                     ?.filterIsInstance<String>()
                     ?: emptyList()
 
-            if (!currentReadBy.contains(userId)) {
+            if (
+                !currentReadBy.contains(
+                    userId
+                )
+            ) {
 
                 transaction.update(
                     messageRef,
@@ -374,8 +398,75 @@ class GroupRepository {
 
 
 
-    // SET GROUP TYPING STATUS
+    // REAL-TIME GROUP TYPING LISTENER
 
+
+
+    fun listenToGroupTyping(
+        groupId: String,
+        currentUserId: String,
+        onTypingUsersChanged:
+            (List<String>) -> Unit,
+        onError:
+            (String) -> Unit
+    ): ListenerRegistration {
+
+        return db.collection("groups")
+            .document(groupId)
+            .collection("typing")
+            .addSnapshotListener {
+
+                    snapshot,
+                    exception ->
+
+                if (exception != null) {
+
+                    onError(
+                        exception.message
+                            ?: "Unable to listen for group typing"
+                    )
+
+                    return@addSnapshotListener
+                }
+
+                val typingUsers =
+                    snapshot
+                        ?.documents
+                        ?.filter { document ->
+
+                            val userId =
+                                document.getString(
+                                    "userId"
+                                )
+                                    ?: document.id
+
+                            val isTyping =
+                                document.getBoolean(
+                                    "isTyping"
+                                )
+                                    ?: false
+
+                            userId != currentUserId &&
+                                    isTyping
+                        }
+                        ?.map { document ->
+
+                            document.getString(
+                                "userId"
+                            )
+                                ?: document.id
+                        }
+                        ?: emptyList()
+
+                onTypingUsersChanged(
+                    typingUsers
+                )
+            }
+    }
+
+
+
+    // SET GROUP TYPING STATUS
 
 
     fun setTyping(
@@ -390,164 +481,42 @@ class GroupRepository {
                 .collection("typing")
                 .document(userId)
 
-        if (!isTyping) {
-
-            typingRef.delete()
-
-            return
-        }
-
-        val typingData =
+        val data =
             hashMapOf(
 
+                "userId" to
+                        userId,
+
                 "isTyping" to
-                        true,
+                        isTyping,
 
                 "timestamp" to
                         System.currentTimeMillis()
             )
 
         typingRef
-            .set(typingData)
+            .set(data)
     }
 
 
 
-    // LISTEN TO GROUP TYPING USERS
-
-    //
-    // Returns UIDs of everyone currently typing,
-    // except the current user.
-    //
-    // =========================================================
-
-    fun listenToGroupTyping(
-        groupId: String,
-        currentUserId: String,
-        onTypingUsersChanged:
-            (List<String>) -> Unit,
-        onError:
-            (String) -> Unit
-    ): ListenerRegistration {
-
-        return db.collection("groups")
-            .document(groupId)
-            .collection("typing")
-
-            .addSnapshotListener {
-                    snapshot,
-                    exception ->
-
-                if (exception != null) {
-
-                    onError(
-                        exception.message
-                            ?: "Unable to load typing status"
-                    )
-
-                    return@addSnapshotListener
-                }
-
-                val currentTime =
-                    System.currentTimeMillis()
-
-                val typingUsers =
-                    snapshot
-                        ?.documents
-                        ?.filter { document ->
-
-                            val isTyping =
-                                document
-                                    .getBoolean(
-                                        "isTyping"
-                                    )
-                                    ?: false
-
-                            val timestamp =
-                                document
-                                    .getLong(
-                                        "timestamp"
-                                    )
-                                    ?: 0L
-
-                            // Ignore current user.
-                            // Also ignore stale typing
-                            // documents older than 10 seconds.
-                            document.id !=
-                                    currentUserId &&
-                                    isTyping &&
-                                    (
-                                            currentTime -
-                                                    timestamp <
-                                                    10_000
-                                            )
-                        }
-                        ?.map { document ->
-
-                            document.id
-                        }
-                        ?: emptyList()
-
-                onTypingUsersChanged(
-                    typingUsers
-                )
-            }
-    }
+    // CLEAR GROUP TYPING STATUS
 
 
-    // =========================================================
-    // REMOVE TYPING STATUS
-    // =========================================================
-
-    fun removeTyping(
+    fun clearTypingStatus(
         groupId: String,
         userId: String
-    ) {
-
-        db.collection("groups")
-            .document(groupId)
-            .collection("typing")
-            .document(userId)
-            .delete()
-    }
-
-
-    // =========================================================
-    // COMPATIBILITY FUNCTION
-    // =========================================================
-    //
-    // If another version of GroupChatScreen uses
-    // setGroupTyping(), it will still work.
-    //
-    // =========================================================
-
-    fun setGroupTyping(
-        groupId: String,
-        userId: String,
-        isTyping: Boolean
     ) {
 
         setTyping(
-            groupId = groupId,
-            userId = userId,
-            isTyping = isTyping
-        )
-    }
+            groupId =
+                groupId,
 
+            userId =
+                userId,
 
-    // =========================================================
-    // COMPATIBILITY FUNCTION
-    // =========================================================
-
-    fun removeGroupTyping(
-        groupId: String,
-        userId: String
-    ) {
-
-        removeTyping(
-            groupId = groupId,
-            userId = userId
+            isTyping =
+                false
         )
     }
 }
-
