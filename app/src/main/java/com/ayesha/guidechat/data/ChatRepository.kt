@@ -1,3 +1,4 @@
+
 package com.ayesha.guidechat.data
 
 import com.ayesha.guidechat.ui.ChatMessage
@@ -11,9 +12,9 @@ class ChatRepository {
         FirebaseFirestore.getInstance()
 
 
-
-    // CREATE A CONSISTENT ONE-TO-ONE CONVERSATION ID
-
+    // =========================================================
+    // CREATE CONSISTENT ONE-TO-ONE CONVERSATION ID
+    // =========================================================
 
     private fun conversationId(
         userId1: String,
@@ -29,9 +30,9 @@ class ChatRepository {
     }
 
 
-
+    // =========================================================
     // SEND MESSAGE
-
+    // =========================================================
 
     fun sendMessage(
         senderId: String,
@@ -53,32 +54,28 @@ class ChatRepository {
             return
         }
 
-
         val id =
             conversationId(
                 senderId,
                 receiverId
             )
 
-
         val conversationRef =
             db.collection("conversations")
                 .document(id)
-
 
         val messageRef =
             conversationRef
                 .collection("messages")
                 .document()
 
-
         val timestamp =
             System.currentTimeMillis()
 
 
-
+        // =====================================================
         // MESSAGE DATA
-
+        // =====================================================
 
         val message =
             hashMapOf(
@@ -95,15 +92,14 @@ class ChatRepository {
                 "timestamp" to
                         timestamp,
 
-                // New messages are unread.
                 "read" to
                         false
             )
 
 
-
+        // =====================================================
         // CONVERSATION DATA
-
+        // =====================================================
 
         val conversation =
             hashMapOf(
@@ -125,9 +121,9 @@ class ChatRepository {
             )
 
 
-
-        // CREATE CONVERSATION + MESSAGE TOGETHER
-
+        // =====================================================
+        // CREATE CONVERSATION + MESSAGE
+        // =====================================================
 
         db.runBatch { batch ->
 
@@ -144,6 +140,12 @@ class ChatRepository {
 
             .addOnSuccessListener {
 
+                // Stop typing after message is sent.
+                clearTypingStatus(
+                    senderId,
+                    receiverId
+                )
+
                 onSuccess()
             }
 
@@ -157,9 +159,9 @@ class ChatRepository {
     }
 
 
-
-    // LISTEN TO MESSAGES IN REAL TIME
-
+    // =========================================================
+    // LISTEN TO ONE-TO-ONE MESSAGES
+    // =========================================================
 
     fun listenForMessages(
         currentUserId: String,
@@ -170,13 +172,11 @@ class ChatRepository {
             (String) -> Unit
     ): ListenerRegistration {
 
-
         val id =
             conversationId(
                 currentUserId,
                 otherUserId
             )
-
 
         return db.collection("conversations")
             .document(id)
@@ -191,11 +191,6 @@ class ChatRepository {
                     snapshot,
                     exception ->
 
-
-
-                // FIRESTORE ERROR
-
-
                 if (exception != null) {
 
                     onError(
@@ -205,8 +200,6 @@ class ChatRepository {
 
                     return@addSnapshotListener
                 }
-
-
 
                 val messages =
                     snapshot
@@ -246,11 +239,6 @@ class ChatRepository {
                                         )
                                         ?: 0L,
 
-                                // Firestore:
-                                // "read"
-                                //
-                                // Kotlin:
-                                // "isRead"
                                 isRead =
                                     document
                                         .getBoolean(
@@ -261,7 +249,6 @@ class ChatRepository {
                         }
                         ?: emptyList()
 
-
                 onMessagesChanged(
                     messages
                 )
@@ -269,14 +256,13 @@ class ChatRepository {
     }
 
 
-
-    // MARK RECEIVED MESSAGES AS READ
-
+    // =========================================================
+    // MARK RECEIVED ONE-TO-ONE MESSAGES AS READ
+    // =========================================================
 
     fun markMessagesAsRead(
         currentUserId: String,
-        otherUserId: String,
-        onError: ((String) -> Unit)? = null
+        otherUserId: String
     ) {
 
         val id =
@@ -285,86 +271,185 @@ class ChatRepository {
                 otherUserId
             )
 
-
         val messagesRef =
             db.collection("conversations")
                 .document(id)
                 .collection("messages")
 
-
-
         messagesRef
-
             .whereEqualTo(
                 "receiverId",
                 currentUserId
             )
-
             .whereEqualTo(
                 "read",
                 false
             )
-
             .get()
 
             .addOnSuccessListener { snapshot ->
-
-
-
-                // NOTHING TO UPDATE
-
 
                 if (snapshot.isEmpty) {
                     return@addOnSuccessListener
                 }
 
-
                 val batch =
                     db.batch()
-
-
-
-                // MARK ALL RECEIVED MESSAGES AS READ
-
 
                 snapshot.documents.forEach { document ->
 
                     batch.update(
                         document.reference,
-
                         "read",
-
                         true
                     )
                 }
 
-
-
-                // COMMIT READ RECEIPTS
-
-
                 batch.commit()
-
-                    .addOnSuccessListener {
-
-                        // Read receipts successfully updated.
-                    }
-
-                    .addOnFailureListener { exception ->
-
-                        onError?.invoke(
-                            exception.message
-                                ?: "Unable to update read receipts"
-                        )
-                    }
             }
+    }
 
-            .addOnFailureListener { exception ->
 
-                onError?.invoke(
-                    exception.message
-                        ?: "Unable to check unread messages"
+    // =========================================================
+    // SET ONE-TO-ONE TYPING STATUS
+    // =========================================================
+    //
+    // Firestore structure:
+    //
+    // conversations/{conversationId}/typing/{userId}
+    //
+    // =========================================================
+
+    fun setTyping(
+        currentUserId: String,
+        otherUserId: String,
+        isTyping: Boolean
+    ) {
+
+        val id =
+            conversationId(
+                currentUserId,
+                otherUserId
+            )
+
+        val typingRef =
+            db.collection("conversations")
+                .document(id)
+                .collection("typing")
+                .document(currentUserId)
+
+        val typingData =
+            hashMapOf(
+
+                "isTyping" to
+                        isTyping,
+
+                "timestamp" to
+                        System.currentTimeMillis()
+            )
+
+        typingRef
+            .set(typingData)
+    }
+
+
+    // =========================================================
+    // CLEAR ONE-TO-ONE TYPING STATUS
+    // =========================================================
+    //
+    // This is the function your ChatScreen.kt currently needs.
+    //
+    // =========================================================
+
+    fun clearTypingStatus(
+        currentUserId: String,
+        otherUserId: String
+    ) {
+
+        val id =
+            conversationId(
+                currentUserId,
+                otherUserId
+            )
+
+        db.collection("conversations")
+            .document(id)
+            .collection("typing")
+            .document(currentUserId)
+            .delete()
+    }
+
+
+    // =========================================================
+    // LISTEN TO OTHER USER TYPING STATUS
+    // =========================================================
+
+    fun listenForTyping(
+        currentUserId: String,
+        otherUserId: String,
+        onTypingChanged:
+            (Boolean) -> Unit,
+        onError:
+            (String) -> Unit
+    ): ListenerRegistration {
+
+        val id =
+            conversationId(
+                currentUserId,
+                otherUserId
+            )
+
+        return db.collection("conversations")
+            .document(id)
+            .collection("typing")
+            .document(otherUserId)
+
+            .addSnapshotListener {
+                    snapshot,
+                    exception ->
+
+                if (exception != null) {
+
+                    onError(
+                        exception.message
+                            ?: "Unable to load typing status"
+                    )
+
+                    return@addSnapshotListener
+                }
+
+                val isTyping =
+                    snapshot
+                        ?.getBoolean(
+                            "isTyping"
+                        )
+                        ?: false
+
+                onTypingChanged(
+                    isTyping
                 )
             }
+    }
+
+
+    // =========================================================
+    // COMPATIBILITY ALIAS
+    // =========================================================
+
+    fun listenToTyping(
+        currentUserId: String,
+        otherUserId: String,
+        onTypingChanged:
+            (Boolean) -> Unit,
+        onError:
+            (String) -> Unit
+    ): ListenerRegistration {
+
+        return listenForTyping(
+            currentUserId = currentUserId,
+            otherUserId = otherUserId,
+            onTypingChanged = onTypingChanged,
+            onError = onError
+        )
     }
 }

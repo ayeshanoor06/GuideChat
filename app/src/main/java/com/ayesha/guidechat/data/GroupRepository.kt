@@ -1,3 +1,4 @@
+
 package com.ayesha.guidechat.data
 
 import com.google.firebase.firestore.FirebaseFirestore
@@ -26,8 +27,8 @@ class GroupRepository {
         FirebaseFirestore.getInstance()
 
 
+     // CREATE GROUP
 
-    // CREATE GROUP
 
     fun createGroup(
         name: String,
@@ -84,14 +85,12 @@ class GroupRepository {
 
         groupRef
             .set(group)
-
             .addOnSuccessListener {
 
                 onSuccess(
                     groupRef.id
                 )
             }
-
             .addOnFailureListener { exception ->
 
                 onError(
@@ -114,8 +113,7 @@ class GroupRepository {
             (String) -> Unit
     ): ListenerRegistration {
 
-        return db
-            .collection("groups")
+        return db.collection("groups")
 
             .whereArrayContains(
                 "memberIds",
@@ -210,7 +208,8 @@ class GroupRepository {
                 .collection("messages")
                 .document()
 
-
+        val timestamp =
+            System.currentTimeMillis()
 
         val message =
             hashMapOf(
@@ -222,8 +221,10 @@ class GroupRepository {
                         cleanText,
 
                 "timestamp" to
-                        System.currentTimeMillis(),
+                        timestamp,
 
+                // Sender has already seen
+                // their own message.
                 "readBy" to
                         listOf(senderId)
             )
@@ -232,6 +233,14 @@ class GroupRepository {
             .set(message)
 
             .addOnSuccessListener {
+
+                // Automatically stop typing
+                // after sending a message.
+                setTyping(
+                    groupId = groupId,
+                    userId = senderId,
+                    isTyping = false
+                )
 
                 onSuccess()
             }
@@ -258,8 +267,7 @@ class GroupRepository {
             (String) -> Unit
     ): ListenerRegistration {
 
-        return db
-            .collection("groups")
+        return db.collection("groups")
             .document(groupId)
             .collection("messages")
 
@@ -343,11 +351,12 @@ class GroupRepository {
         db.runTransaction { transaction ->
 
             val snapshot =
-                transaction.get(messageRef)
+                transaction.get(
+                    messageRef
+                )
 
             val currentReadBy =
-                (snapshot
-                    .get("readBy")
+                (snapshot.get("readBy")
                         as? List<*>)
                     ?.filterIsInstance<String>()
                     ?: emptyList()
@@ -362,4 +371,183 @@ class GroupRepository {
             }
         }
     }
+
+
+
+    // SET GROUP TYPING STATUS
+
+
+
+    fun setTyping(
+        groupId: String,
+        userId: String,
+        isTyping: Boolean
+    ) {
+
+        val typingRef =
+            db.collection("groups")
+                .document(groupId)
+                .collection("typing")
+                .document(userId)
+
+        if (!isTyping) {
+
+            typingRef.delete()
+
+            return
+        }
+
+        val typingData =
+            hashMapOf(
+
+                "isTyping" to
+                        true,
+
+                "timestamp" to
+                        System.currentTimeMillis()
+            )
+
+        typingRef
+            .set(typingData)
+    }
+
+
+
+    // LISTEN TO GROUP TYPING USERS
+
+    //
+    // Returns UIDs of everyone currently typing,
+    // except the current user.
+    //
+    // =========================================================
+
+    fun listenToGroupTyping(
+        groupId: String,
+        currentUserId: String,
+        onTypingUsersChanged:
+            (List<String>) -> Unit,
+        onError:
+            (String) -> Unit
+    ): ListenerRegistration {
+
+        return db.collection("groups")
+            .document(groupId)
+            .collection("typing")
+
+            .addSnapshotListener {
+                    snapshot,
+                    exception ->
+
+                if (exception != null) {
+
+                    onError(
+                        exception.message
+                            ?: "Unable to load typing status"
+                    )
+
+                    return@addSnapshotListener
+                }
+
+                val currentTime =
+                    System.currentTimeMillis()
+
+                val typingUsers =
+                    snapshot
+                        ?.documents
+                        ?.filter { document ->
+
+                            val isTyping =
+                                document
+                                    .getBoolean(
+                                        "isTyping"
+                                    )
+                                    ?: false
+
+                            val timestamp =
+                                document
+                                    .getLong(
+                                        "timestamp"
+                                    )
+                                    ?: 0L
+
+                            // Ignore current user.
+                            // Also ignore stale typing
+                            // documents older than 10 seconds.
+                            document.id !=
+                                    currentUserId &&
+                                    isTyping &&
+                                    (
+                                            currentTime -
+                                                    timestamp <
+                                                    10_000
+                                            )
+                        }
+                        ?.map { document ->
+
+                            document.id
+                        }
+                        ?: emptyList()
+
+                onTypingUsersChanged(
+                    typingUsers
+                )
+            }
+    }
+
+
+    // =========================================================
+    // REMOVE TYPING STATUS
+    // =========================================================
+
+    fun removeTyping(
+        groupId: String,
+        userId: String
+    ) {
+
+        db.collection("groups")
+            .document(groupId)
+            .collection("typing")
+            .document(userId)
+            .delete()
+    }
+
+
+    // =========================================================
+    // COMPATIBILITY FUNCTION
+    // =========================================================
+    //
+    // If another version of GroupChatScreen uses
+    // setGroupTyping(), it will still work.
+    //
+    // =========================================================
+
+    fun setGroupTyping(
+        groupId: String,
+        userId: String,
+        isTyping: Boolean
+    ) {
+
+        setTyping(
+            groupId = groupId,
+            userId = userId,
+            isTyping = isTyping
+        )
+    }
+
+
+    // =========================================================
+    // COMPATIBILITY FUNCTION
+    // =========================================================
+
+    fun removeGroupTyping(
+        groupId: String,
+        userId: String
+    ) {
+
+        removeTyping(
+            groupId = groupId,
+            userId = userId
+        )
+    }
 }
+
