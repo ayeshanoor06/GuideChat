@@ -1,19 +1,23 @@
 package com.ayesha.guidechat.data
 
+import android.content.Context
 import com.ayesha.guidechat.ui.ChatMessage
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 
-class ChatRepository {
+class ChatRepository(
+    context: Context
+) {
 
-    private val db =
-        FirebaseFirestore.getInstance()
+    private val db = FirebaseFirestore.getInstance()
 
+    private val encryptionManager =
+        EncryptionManager(context.applicationContext)
 
-
-    // CREATE CONSISTENT ONE-TO-ONE CONVERSATION ID
-
+    // =========================================================
+    // CONSISTENT ONE-TO-ONE CONVERSATION ID
+    // =========================================================
 
     private fun conversationId(
         userId1: String,
@@ -28,10 +32,9 @@ class ChatRepository {
             .joinToString("_")
     }
 
-
-
+    // =========================================================
     // SEND MESSAGE
-
+    // =========================================================
 
     fun sendMessage(
         senderId: String,
@@ -41,118 +44,104 @@ class ChatRepository {
         onError: (String) -> Unit
     ) {
 
-        val cleanText =
-            text.trim()
+        val cleanText = text.trim()
 
         if (cleanText.isEmpty()) {
-
-            onError(
-                "Message cannot be empty"
-            )
-
+            onError("Message cannot be empty")
             return
         }
 
-        val id =
-            conversationId(
-                senderId,
-                receiverId
+        try {
+
+            val encryptedText =
+                encryptionManager.encrypt(
+                    plainText = cleanText,
+                    userId1 = senderId,
+                    userId2 = receiverId
+                )
+
+            val id = conversationId(
+                userId1 = senderId,
+                userId2 = receiverId
             )
 
-        val conversationRef =
-            db.collection("conversations")
-                .document(id)
+            val conversationRef =
+                db.collection("conversations")
+                    .document(id)
 
-        val messageRef =
-            conversationRef
-                .collection("messages")
-                .document()
+            val messageRef =
+                conversationRef
+                    .collection("messages")
+                    .document()
 
-        val timestamp =
-            System.currentTimeMillis()
+            val timestamp =
+                System.currentTimeMillis()
 
-        val message =
-            hashMapOf(
-
-                "senderId" to
-                        senderId,
-
-                "receiverId" to
-                        receiverId,
-
-                "text" to
-                        cleanText,
-
-                "timestamp" to
-                        timestamp,
-
-                "read" to
-                        false
+            val message = hashMapOf(
+                "senderId" to senderId,
+                "receiverId" to receiverId,
+                "text" to encryptedText,
+                "timestamp" to timestamp,
+                "read" to false
             )
 
-        val conversation =
-            hashMapOf(
-
-                "participants" to
-                        listOf(
-                            senderId,
-                            receiverId
-                        ),
-
-                "lastMessage" to
-                        cleanText,
-
-                "lastMessageSenderId" to
-                        senderId,
-
-                "lastMessageTimestamp" to
-                        timestamp
+            val conversation = hashMapOf(
+                "participants" to listOf(
+                    senderId,
+                    receiverId
+                ),
+                "lastMessage" to encryptedText,
+                "lastMessageSenderId" to senderId,
+                "lastMessageTimestamp" to timestamp
             )
 
-        db.runBatch { batch ->
+            db.runBatch { batch ->
 
-            batch.set(
-                conversationRef,
-                conversation
-            )
+                batch.set(
+                    conversationRef,
+                    conversation
+                )
 
-            batch.set(
-                messageRef,
-                message
-            )
-        }
-            .addOnSuccessListener {
-
-                onSuccess()
-            }
-            .addOnFailureListener { exception ->
-
-                onError(
-                    exception.message
-                        ?: "Unable to send message"
+                batch.set(
+                    messageRef,
+                    message
                 )
             }
+                .addOnSuccessListener {
+                    onSuccess()
+                }
+                .addOnFailureListener { exception ->
+
+                    onError(
+                        exception.message
+                            ?: "Unable to send message"
+                    )
+                }
+
+        } catch (exception: Exception) {
+
+            onError(
+                exception.message
+                    ?: "Unable to encrypt message"
+            )
+        }
     }
 
-
-
-    // REAL-TIME MESSAGE LISTENER
-
+    // =========================================================
+    // LISTEN FOR MESSAGES
+    // =========================================================
 
     fun listenForMessages(
         currentUserId: String,
         otherUserId: String,
-        onMessagesChanged:
-            (List<ChatMessage>) -> Unit,
-        onError:
-            (String) -> Unit
+        onMessagesChanged: (List<ChatMessage>) -> Unit,
+        onError: (String) -> Unit
     ): ListenerRegistration {
 
-        val id =
-            conversationId(
-                currentUserId,
-                otherUserId
-            )
+        val id = conversationId(
+            userId1 = currentUserId,
+            userId2 = otherUserId
+        )
 
         return db.collection("conversations")
             .document(id)
@@ -161,10 +150,7 @@ class ChatRepository {
                 "timestamp",
                 Query.Direction.ASCENDING
             )
-            .addSnapshotListener {
-
-                    snapshot,
-                    exception ->
+            .addSnapshotListener { snapshot, exception ->
 
                 if (exception != null) {
 
@@ -176,15 +162,28 @@ class ChatRepository {
                     return@addSnapshotListener
                 }
 
-                val messages =
+                val messages: List<ChatMessage> =
                     snapshot
                         ?.documents
                         ?.map { document ->
 
-                            ChatMessage(
+                            val encryptedText =
+                                document.getString("text")
+                                    ?: ""
 
-                                id =
-                                    document.id,
+                            val decryptedText =
+                                if (encryptedText.isEmpty()) {
+                                    ""
+                                } else {
+                                    encryptionManager.decrypt(
+                                        encryptedText = encryptedText,
+                                        userId1 = currentUserId,
+                                        userId2 = otherUserId
+                                    )
+                                }
+
+                            ChatMessage(
+                                id = document.id,
 
                                 senderId =
                                     document.getString(
@@ -196,10 +195,7 @@ class ChatRepository {
                                         "receiverId"
                                     ) ?: "",
 
-                                text =
-                                    document.getString(
-                                        "text"
-                                    ) ?: "",
+                                text = decryptedText,
 
                                 timestamp =
                                     document.getLong(
@@ -214,134 +210,23 @@ class ChatRepository {
                         }
                         ?: emptyList()
 
-                // This is called automatically whenever
-                // Firestore data changes.
                 onMessagesChanged(messages)
             }
     }
 
-
-
-    // REAL-TIME TYPING LISTENER
-
-    // Returns true when the OTHER USER is  .
-
-
-    fun listenForTyping(
-        currentUserId: String,
-        otherUserId: String,
-        onTypingChanged:
-            (Boolean) -> Unit,
-        onError:
-            (String) -> Unit
-    ): ListenerRegistration {
-
-        val id =
-            conversationId(
-                currentUserId,
-                otherUserId
-            )
-
-        return db.collection("conversations")
-            .document(id)
-            .collection("typing")
-            .document(otherUserId)
-            .addSnapshotListener {
-
-                    snapshot,
-                    exception ->
-
-                if (exception != null) {
-
-                    onError(
-                        exception.message
-                            ?: "Unable to listen for typing"
-                    )
-
-                    return@addSnapshotListener
-                }
-
-                val isTyping =
-                    snapshot
-                        ?.getBoolean("isTyping")
-                        ?: false
-
-                onTypingChanged(isTyping)
-            }
-    }
-
-
-
-    // SET TYPING STATUS
-
-
-    fun setTyping(
-        currentUserId: String,
-        otherUserId: String,
-        isTyping: Boolean
-    ) {
-
-        val id =
-            conversationId(
-                currentUserId,
-                otherUserId
-            )
-
-        val typingRef =
-            db.collection("conversations")
-                .document(id)
-                .collection("typing")
-                .document(currentUserId)
-
-        val data =
-            hashMapOf(
-
-                "userId" to
-                        currentUserId,
-
-                "isTyping" to
-                        isTyping,
-
-                "timestamp" to
-                        System.currentTimeMillis()
-            )
-
-        typingRef
-            .set(data)
-    }
-
-
-
-    // CLEAR TYPING STATUS
-
-
-    fun clearTypingStatus(
-        currentUserId: String,
-        otherUserId: String
-    ) {
-
-        setTyping(
-            currentUserId = currentUserId,
-            otherUserId = otherUserId,
-            isTyping = false
-        )
-    }
-
-
-
-    // MARK RECEIVED MESSAGES AS READ
-
+    // =========================================================
+    // MARK MESSAGES AS READ
+    // =========================================================
 
     fun markMessagesAsRead(
         currentUserId: String,
         otherUserId: String
     ) {
 
-        val id =
-            conversationId(
-                currentUserId,
-                otherUserId
-            )
+        val id = conversationId(
+            userId1 = currentUserId,
+            userId2 = otherUserId
+        )
 
         val messagesRef =
             db.collection("conversations")
@@ -364,8 +249,7 @@ class ChatRepository {
                     return@addOnSuccessListener
                 }
 
-                val batch =
-                    db.batch()
+                val batch = db.batch()
 
                 snapshot.documents.forEach { document ->
 
@@ -377,6 +261,118 @@ class ChatRepository {
                 }
 
                 batch.commit()
+            }
+    }
+
+    // =========================================================
+    // TYPING REFERENCE
+    // =========================================================
+
+    private fun typingReference(
+        currentUserId: String,
+        otherUserId: String,
+        userId: String
+    ) =
+
+        db.collection("conversations")
+            .document(
+                conversationId(
+                    userId1 = currentUserId,
+                    userId2 = otherUserId
+                )
+            )
+            .collection("typing")
+            .document(userId)
+
+    // =========================================================
+    // SET TYPING
+    // =========================================================
+
+    fun setTyping(
+        currentUserId: String,
+        otherUserId: String,
+        isTyping: Boolean
+    ) {
+
+        val reference =
+            typingReference(
+                currentUserId = currentUserId,
+                otherUserId = otherUserId,
+                userId = currentUserId
+            )
+
+        if (isTyping) {
+
+            val data = hashMapOf(
+                "userId" to currentUserId,
+                "isTyping" to true,
+                "timestamp" to System.currentTimeMillis()
+            )
+
+            reference.set(data)
+
+        } else {
+
+            reference.delete()
+        }
+    }
+
+    // =========================================================
+    // CLEAR TYPING STATUS
+    // =========================================================
+
+    fun clearTypingStatus(
+        currentUserId: String,
+        otherUserId: String
+    ) {
+
+        val reference =
+            typingReference(
+                currentUserId = currentUserId,
+                otherUserId = otherUserId,
+                userId = currentUserId
+            )
+
+        reference.delete()
+    }
+
+    // =========================================================
+    // LISTEN FOR OTHER USER TYPING
+    // =========================================================
+
+    fun listenForTyping(
+        currentUserId: String,
+        otherUserId: String,
+        onTypingChanged: (Boolean) -> Unit,
+        onError: (String) -> Unit
+    ): ListenerRegistration {
+
+        val reference =
+            typingReference(
+                currentUserId = currentUserId,
+                otherUserId = otherUserId,
+                userId = otherUserId
+            )
+
+        return reference
+            .addSnapshotListener { snapshot, exception ->
+
+                if (exception != null) {
+
+                    onError(
+                        exception.message
+                            ?: "Unable to listen for typing"
+                    )
+
+                    return@addSnapshotListener
+                }
+
+                val isTyping =
+                    snapshot?.getBoolean(
+                        "isTyping"
+                    ) ?: false
+
+                onTypingChanged(isTyping)
             }
     }
 }

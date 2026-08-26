@@ -14,16 +14,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -36,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -44,17 +47,23 @@ import com.ayesha.guidechat.model.UserProfile
 import kotlinx.coroutines.delay
 
 
-private val DarkGreen =
+private val ChatGreen =
     Color(0xFF2E6F40)
 
-private val LightMint =
+private val ChatLightGreen =
     Color(0xFFCFFDDC)
 
-private val Background =
-    Color(0xFFF7FAF7)
+private val ChatBackground =
+    Color(0xFFF8FBF9)
 
-private val DarkText =
+private val ChatText =
     Color(0xFF253D2C)
+
+private val ChatSecondary =
+    Color(0xFF6B756E)
+
+private val ReadBlue =
+    Color(0xFF2196F3)
 
 
 data class ChatMessage(
@@ -76,27 +85,12 @@ fun ChatScreen(
 ) {
 
     val context =
-        androidx.compose.ui.platform.LocalContext.current
-
+        LocalContext.current
 
     val chatRepository =
-        remember {
-            ChatRepository()
+        remember(context) {
+            ChatRepository(context)
         }
-
-
-
-    // MESSAGE TEXT
-
-
-    var messageText by remember {
-        mutableStateOf("")
-    }
-
-
-
-    // MESSAGES
-
 
     var messages by remember {
         mutableStateOf<List<ChatMessage>>(
@@ -104,28 +98,25 @@ fun ChatScreen(
         )
     }
 
-
-
-    // ERROR
-
-
-    var errorMessage by remember {
-        mutableStateOf<String?>(null)
+    var messageText by remember {
+        mutableStateOf("")
     }
-
-
-
-    // OTHER USER TYPING STATUS
-
 
     var isOtherUserTyping by remember {
         mutableStateOf(false)
     }
 
+    var errorMessage by remember {
+        mutableStateOf<String?>(null)
+    }
+
+    val listState =
+        rememberLazyListState()
 
 
+    // =========================================================
     // LISTEN FOR MESSAGES
-
+    // =========================================================
 
     DisposableEffect(
         currentUserId,
@@ -134,17 +125,16 @@ fun ChatScreen(
 
         val listener =
             chatRepository.listenForMessages(
-
                 currentUserId =
                     currentUserId,
 
                 otherUserId =
                     otherUser.uid,
 
-                onMessagesChanged = { newMessages ->
+                onMessagesChanged = { result ->
 
                     messages =
-                        newMessages
+                        result
 
                     errorMessage =
                         null
@@ -157,17 +147,15 @@ fun ChatScreen(
                 }
             )
 
-
         onDispose {
-
             listener.remove()
         }
     }
 
 
-
+    // =========================================================
     // LISTEN FOR OTHER USER TYPING
-
+    // =========================================================
 
     DisposableEffect(
         currentUserId,
@@ -176,7 +164,6 @@ fun ChatScreen(
 
         val typingListener =
             chatRepository.listenForTyping(
-
                 currentUserId =
                     currentUserId,
 
@@ -190,17 +177,15 @@ fun ChatScreen(
                 },
 
                 onError = {
-                    // Typing errors should not interrupt chat.
+
+                    isOtherUserTyping =
+                        false
                 }
             )
-
 
         onDispose {
 
             typingListener.remove()
-
-            // Make sure OUR typing status
-            // is cleared when leaving the screen.
 
             chatRepository.clearTypingStatus(
                 currentUserId =
@@ -213,9 +198,9 @@ fun ChatScreen(
     }
 
 
-
+    // =========================================================
     // MARK RECEIVED MESSAGES AS READ
-
+    // =========================================================
 
     LaunchedEffect(
         currentUserId,
@@ -226,7 +211,6 @@ fun ChatScreen(
         if (messages.isNotEmpty()) {
 
             chatRepository.markMessagesAsRead(
-
                 currentUserId =
                     currentUserId,
 
@@ -237,16 +221,15 @@ fun ChatScreen(
     }
 
 
-
-    // TYPING INDICATOR
-
+    // =========================================================
+    // TYPING STATUS
+    // =========================================================
 
     LaunchedEffect(messageText) {
 
         if (messageText.isBlank()) {
 
             chatRepository.setTyping(
-
                 currentUserId =
                     currentUserId,
 
@@ -260,11 +243,7 @@ fun ChatScreen(
             return@LaunchedEffect
         }
 
-
-        // User is typing.
-
         chatRepository.setTyping(
-
             currentUserId =
                 currentUserId,
 
@@ -275,17 +254,9 @@ fun ChatScreen(
                 true
         )
 
-
-        // Wait until the user stops typing.
-
-        delay(1000)
-
-
-        // If this coroutine wasn't restarted by
-        // another text change, the user has stopped.
+        delay(1500)
 
         chatRepository.setTyping(
-
             currentUserId =
                 currentUserId,
 
@@ -298,27 +269,40 @@ fun ChatScreen(
     }
 
 
+    // =========================================================
+    // SCROLL TO LATEST MESSAGE
+    // =========================================================
 
+    LaunchedEffect(messages.size) {
+
+        if (messages.isNotEmpty()) {
+
+            listState.animateScrollToItem(
+                messages.lastIndex
+            )
+        }
+    }
+
+
+    // =========================================================
     // MAIN UI
-
+    // =========================================================
 
     Column(
-
         modifier =
             Modifier
                 .fillMaxSize()
                 .background(
-                    Background
+                    ChatBackground
                 )
     ) {
 
 
-
+        // =====================================================
         // TOP BAR
-
+        // =====================================================
 
         Row(
-
             modifier =
                 Modifier
                     .fillMaxWidth()
@@ -334,39 +318,34 @@ fun ChatScreen(
                 Alignment.CenterVertically
         ) {
 
-
-            // BACK BUTTON
-
             IconButton(
                 onClick = onBack
             ) {
 
                 Icon(
-
                     imageVector =
-                        Icons.Default.ArrowBack,
+                        Icons.AutoMirrored.Filled.ArrowBack,
 
                     contentDescription =
                         "Back",
 
                     tint =
-                        DarkGreen
+                        ChatText
                 )
             }
 
 
-            // PROFILE CIRCLE
+            // AVATAR
 
             Box(
-
                 modifier =
                     Modifier
-                        .size(44.dp)
+                        .size(48.dp)
                         .clip(
                             CircleShape
                         )
                         .background(
-                            LightMint
+                            ChatLightGreen
                         ),
 
                 contentAlignment =
@@ -374,21 +353,21 @@ fun ChatScreen(
             ) {
 
                 Text(
-
                     text =
                         otherUser.name
+                            .trim()
                             .firstOrNull()
                             ?.uppercase()
-                            ?: "?",
+                            ?: "U",
 
                     fontSize =
-                        17.sp,
+                        20.sp,
 
                     fontWeight =
                         FontWeight.Bold,
 
                     color =
-                        DarkGreen
+                        ChatGreen
                 )
             }
 
@@ -399,8 +378,7 @@ fun ChatScreen(
             )
 
 
-             // NAME + TYPING STATUS
-
+            // NAME + STATUS
 
             Column(
                 modifier =
@@ -408,7 +386,6 @@ fun ChatScreen(
             ) {
 
                 Text(
-
                     text =
                         otherUser.name.ifBlank {
                             "User"
@@ -421,24 +398,17 @@ fun ChatScreen(
                         FontWeight.Bold,
 
                     color =
-                        DarkText
+                        ChatText
                 )
-
 
                 Spacer(
                     modifier =
                         Modifier.height(2.dp)
                 )
 
-
-
-                // TYPING INDICATOR
-
-
                 if (isOtherUserTyping) {
 
                     Text(
-
                         text =
                             "typing...",
 
@@ -446,7 +416,7 @@ fun ChatScreen(
                             12.sp,
 
                         color =
-                            DarkGreen,
+                            ChatGreen,
 
                         fontWeight =
                             FontWeight.Medium
@@ -455,7 +425,6 @@ fun ChatScreen(
                 } else {
 
                     Text(
-
                         text =
                             otherUser.role.ifBlank {
                                 "User"
@@ -465,43 +434,37 @@ fun ChatScreen(
                             12.sp,
 
                         color =
-                            DarkGreen
+                            ChatSecondary
                     )
                 }
             }
 
 
-            // MORE OPTIONS
-
             IconButton(
-                onClick = {
-                    // Chat options will be added later.
-                }
+                onClick = {}
             ) {
 
                 Icon(
-
                     imageVector =
                         Icons.Default.MoreVert,
 
                     contentDescription =
-                        "Chat options",
+                        "More",
 
                     tint =
-                        DarkText
+                        ChatText
                 )
             }
         }
 
 
-
+        // =====================================================
         // ERROR
-
+        // =====================================================
 
         if (errorMessage != null) {
 
             Text(
-
                 text =
                     errorMessage ?: "",
 
@@ -524,14 +487,13 @@ fun ChatScreen(
         }
 
 
-
+        // =====================================================
         // MESSAGES
-
+        // =====================================================
 
         if (messages.isEmpty()) {
 
             Box(
-
                 modifier =
                     Modifier
                         .fillMaxWidth()
@@ -542,13 +504,11 @@ fun ChatScreen(
             ) {
 
                 Column(
-
                     horizontalAlignment =
                         Alignment.CenterHorizontally
                 ) {
 
                     Box(
-
                         modifier =
                             Modifier
                                 .size(90.dp)
@@ -556,7 +516,7 @@ fun ChatScreen(
                                     CircleShape
                                 )
                                 .background(
-                                    LightMint
+                                    ChatLightGreen
                                 ),
 
                         contentAlignment =
@@ -564,12 +524,11 @@ fun ChatScreen(
                     ) {
 
                         Text(
-
                             text =
                                 otherUser.name
                                     .firstOrNull()
                                     ?.uppercase()
-                                    ?: "?",
+                                    ?: "U",
 
                             fontSize =
                                 32.sp,
@@ -578,19 +537,16 @@ fun ChatScreen(
                                 FontWeight.Bold,
 
                             color =
-                                DarkGreen
+                                ChatGreen
                         )
                     }
-
 
                     Spacer(
                         modifier =
                             Modifier.height(18.dp)
                     )
 
-
                     Text(
-
                         text =
                             "Start a conversation",
 
@@ -601,18 +557,15 @@ fun ChatScreen(
                             FontWeight.Bold,
 
                         color =
-                            DarkText
+                            ChatText
                     )
-
 
                     Spacer(
                         modifier =
                             Modifier.height(6.dp)
                     )
 
-
                     Text(
-
                         text =
                             "Send a message to ${otherUser.name}",
 
@@ -620,66 +573,61 @@ fun ChatScreen(
                             14.sp,
 
                         color =
-                            Color.Gray
+                            ChatSecondary
                     )
                 }
             }
 
         } else {
 
-
-
-            // MESSAGE LIST
-
-
             LazyColumn(
+                state =
+                    listState,
 
                 modifier =
                     Modifier
                         .fillMaxWidth()
                         .weight(1f)
                         .padding(
-                            horizontal = 16.dp,
+                            horizontal = 14.dp,
                             vertical = 12.dp
                         ),
 
                 verticalArrangement =
-                    Arrangement.spacedBy(8.dp),
-
-                reverseLayout =
-                    false
+                    Arrangement.spacedBy(
+                        8.dp
+                    )
             ) {
 
                 items(
-
                     items =
                         messages,
 
-                    key = { message ->
+                    key = {
+                            message ->
                         message.id
                     }
 
                 ) { message ->
 
-                    MessageBubble(
-
+                    ChatMessageBubble(
                         message =
                             message,
 
-                        currentUserId =
-                            currentUserId
+                        isMine =
+                            message.senderId ==
+                                    currentUserId
                     )
                 }
             }
         }
 
 
-
+        // =====================================================
         // MESSAGE INPUT
-
+        // =====================================================
 
         Row(
-
             modifier =
                 Modifier
                     .fillMaxWidth()
@@ -695,23 +643,45 @@ fun ChatScreen(
                 Alignment.CenterVertically
         ) {
 
-
             OutlinedTextField(
 
                 value =
                     messageText,
 
-                onValueChange = {
+                onValueChange = { newText ->
 
                     messageText =
-                        it
+                        newText
+
+                    if (newText.isBlank()) {
+
+                        chatRepository.clearTypingStatus(
+                            currentUserId =
+                                currentUserId,
+
+                            otherUserId =
+                                otherUser.uid
+                        )
+
+                    } else {
+
+                        chatRepository.setTyping(
+                            currentUserId =
+                                currentUserId,
+
+                            otherUserId =
+                                otherUser.uid,
+
+                            isTyping =
+                                true
+                        )
+                    }
                 },
 
                 modifier =
                     Modifier.weight(1f),
 
                 placeholder = {
-
                     Text(
                         "Type a message..."
                     )
@@ -722,7 +692,21 @@ fun ChatScreen(
 
                 shape =
                     RoundedCornerShape(
-                        24.dp
+                        22.dp
+                    ),
+
+                colors =
+                    OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor =
+                            ChatGreen,
+
+                        unfocusedBorderColor =
+                            Color(
+                                0xFFD5DED7
+                            ),
+
+                        cursorColor =
+                            ChatGreen
                     )
             )
 
@@ -733,36 +717,26 @@ fun ChatScreen(
             )
 
 
-
             // SEND BUTTON
-
 
             IconButton(
 
                 onClick = {
 
-                    val textToSend =
+                    val text =
                         messageText.trim()
 
-
-                    if (textToSend.isEmpty()) {
-
+                    if (text.isEmpty()) {
                         return@IconButton
                     }
 
 
-                    // Stop typing immediately.
-
-                    chatRepository.setTyping(
-
+                    chatRepository.clearTypingStatus(
                         currentUserId =
                             currentUserId,
 
                         otherUserId =
-                            otherUser.uid,
-
-                        isTyping =
-                            false
+                            otherUser.uid
                     )
 
 
@@ -775,7 +749,7 @@ fun ChatScreen(
                             otherUser.uid,
 
                         text =
-                            textToSend,
+                            text,
 
                         onSuccess = {
 
@@ -786,140 +760,92 @@ fun ChatScreen(
                         onError = { error ->
 
                             Toast.makeText(
-
                                 context,
-
                                 error,
-
                                 Toast.LENGTH_LONG
-
                             ).show()
                         }
                     )
                 },
 
-                enabled =
-                    messageText.isNotBlank()
+                modifier =
+                    Modifier
+                        .size(48.dp)
+                        .clip(
+                            CircleShape
+                        )
+                        .background(
+                            if (
+                                messageText
+                                    .isNotBlank()
+                            ) {
+                                ChatGreen
+                            } else {
+                                Color.LightGray
+                            }
+                        )
             ) {
 
-                Box(
+                Icon(
+                    imageVector =
+                        Icons.AutoMirrored.Filled.Send,
 
-                    modifier =
-                        Modifier
-                            .size(48.dp)
-                            .clip(
-                                CircleShape
-                            )
-                            .background(
+                    contentDescription =
+                        "Send",
 
-                                if (
-                                    messageText.isNotBlank()
-                                ) {
-
-                                    DarkGreen
-
-                                } else {
-
-                                    Color.LightGray
-                                }
-                            ),
-
-                    contentAlignment =
-                        Alignment.Center
-                ) {
-
-                    Icon(
-
-                        imageVector =
-                            Icons.Default.Send,
-
-                        contentDescription =
-                            "Send",
-
-                        tint =
-                            Color.White,
-
-                        modifier =
-                            Modifier.size(21.dp)
-                    )
-                }
+                    tint =
+                        Color.White
+                )
             }
         }
     }
 }
 
 
-
+// =============================================================
 // MESSAGE BUBBLE
-
+// =============================================================
 
 @Composable
-private fun MessageBubble(
-
+private fun ChatMessageBubble(
     message: ChatMessage,
-
-    currentUserId: String
+    isMine: Boolean
 ) {
 
-    val isMine =
-        message.senderId ==
-                currentUserId
-
-
     Row(
-
         modifier =
             Modifier.fillMaxWidth(),
 
         horizontalArrangement =
             if (isMine) {
-
                 Arrangement.End
-
             } else {
-
                 Arrangement.Start
             }
     ) {
 
         Column(
-
             horizontalAlignment =
                 if (isMine) {
-
                     Alignment.End
-
                 } else {
-
                     Alignment.Start
                 }
         ) {
 
-
-
-            // MESSAGE BUBBLE
-
-
             Box(
-
                 modifier =
                     Modifier
                         .clip(
                             RoundedCornerShape(
-
-                                topStart =
-                                    18.dp,
-
-                                topEnd =
-                                    18.dp,
-
+                                topStart = 18.dp,
+                                topEnd = 18.dp,
                                 bottomStart =
                                     if (isMine) {
                                         18.dp
                                     } else {
                                         4.dp
                                     },
-
                                 bottomEnd =
                                     if (isMine) {
                                         4.dp
@@ -929,28 +855,19 @@ private fun MessageBubble(
                             )
                         )
                         .background(
-
                             if (isMine) {
-
-                                LightMint
-
+                                ChatLightGreen
                             } else {
-
                                 Color.White
                             }
                         )
                         .padding(
-
-                            horizontal =
-                                15.dp,
-
-                            vertical =
-                                10.dp
+                            horizontal = 15.dp,
+                            vertical = 10.dp
                         )
             ) {
 
                 Text(
-
                     text =
                         message.text,
 
@@ -958,87 +875,45 @@ private fun MessageBubble(
                         15.sp,
 
                     color =
-                        DarkText
+                        ChatText
                 )
             }
 
 
-
+            // =================================================
             // READ RECEIPT
-            //
-            // One tick = sent
-            // Two ticks = read
-
+            // =================================================
 
             if (isMine) {
 
                 Row(
-
-                    verticalAlignment =
-                        Alignment.CenterVertically,
-
                     modifier =
                         Modifier.padding(
                             top = 2.dp,
                             end = 4.dp
-                        )
+                        ),
+
+                    verticalAlignment =
+                        Alignment.CenterVertically
                 ) {
 
+                    Text(
+                        text =
+                            "✓✓",
 
-                    if (message.isRead) {
+                        fontSize =
+                            14.sp,
 
-                        // TWO TICKS = READ
+                        fontWeight =
+                            FontWeight.Bold,
 
-                        Icon(
-
-                            imageVector =
-                                Icons.Default.Done,
-
-                            contentDescription =
-                                "Read",
-
-                            modifier =
-                                Modifier.size(13.dp),
-
-                            tint =
-                                DarkGreen
-                        )
-
-                        Icon(
-
-                            imageVector =
-                                Icons.Default.Done,
-
-                            contentDescription =
-                                "Read",
-
-                            modifier =
-                                Modifier
-                                    .size(13.dp),
-
-                            tint =
-                                DarkGreen
-                        )
-
-                    } else {
-
-                        // ONE TICK = SENT
-
-                        Icon(
-
-                            imageVector =
-                                Icons.Default.Done,
-
-                            contentDescription =
-                                "Sent",
-
-                            modifier =
-                                Modifier.size(13.dp),
-
-                            tint =
-                                Color.Gray
-                        )
-                    }
+                        color =
+                            if (message.isRead) {
+                                ReadBlue
+                            } else {
+                                ChatGreen
+                            }
+                    )
                 }
             }
         }

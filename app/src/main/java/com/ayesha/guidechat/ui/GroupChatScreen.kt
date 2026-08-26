@@ -18,11 +18,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.Done
 import androidx.compose.material.icons.filled.Group
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -65,6 +65,10 @@ private val GroupText =
 private val GroupSecondary =
     Color(0xFF6B756E)
 
+private val ReadBlue =
+    Color(0xFF2196F3)
+
+
 @Composable
 fun GroupChatScreen(
     group: GroupModel,
@@ -72,15 +76,23 @@ fun GroupChatScreen(
     onBack: () -> Unit
 ) {
 
+    val context =
+        androidx.compose.ui.platform.LocalContext.current
+
     val groupRepository =
         remember {
-            GroupRepository()
+            GroupRepository(context)
         }
 
     val userRepository =
         remember {
             UserRepository()
         }
+
+
+    // =========================================================
+    // STATE
+    // =========================================================
 
     var messages by remember {
         mutableStateOf<List<GroupMessage>>(
@@ -112,9 +124,9 @@ fun GroupChatScreen(
         rememberLazyListState()
 
 
-
+    // =========================================================
     // LOAD GROUP MEMBERS
-
+    // =========================================================
 
     LaunchedEffect(
         group.id,
@@ -141,15 +153,17 @@ fun GroupChatScreen(
                         loadedUsers.toMap()
                 },
 
-                onError = {}
+                onError = {
+                    // UID fallback will be used.
+                }
             )
         }
     }
 
 
-
-    // LISTEN GROUP MESSAGES
-
+    // =========================================================
+    // LISTEN TO GROUP MESSAGES
+    // =========================================================
 
     DisposableEffect(
         group.id
@@ -161,8 +175,7 @@ fun GroupChatScreen(
                 groupId =
                     group.id,
 
-                onMessagesChanged = {
-                        result ->
+                onMessagesChanged = { result ->
 
                     messages =
                         result
@@ -185,9 +198,9 @@ fun GroupChatScreen(
     }
 
 
-
-    // LISTEN GROUP TYPING
-
+    // =========================================================
+    // LISTEN TO GROUP TYPING
+    // =========================================================
 
     DisposableEffect(
         group.id,
@@ -210,39 +223,72 @@ fun GroupChatScreen(
                         users
                 },
 
-                onError = {}
+                onError = {
+                    // Typing errors should not
+                    // interrupt the group chat.
+                }
             )
 
         onDispose {
 
             typingListener.remove()
 
-            groupRepository.setTyping(
+            groupRepository.clearTypingStatus(
 
                 groupId =
                     group.id,
 
                 userId =
-                    currentUserId,
-
-                isTyping =
-                    false
+                    currentUserId
             )
         }
     }
 
 
+    // =========================================================
+    // MARK INCOMING MESSAGES AS READ
+    // =========================================================
 
+    LaunchedEffect(
+        messages,
+        currentUserId
+    ) {
+
+        messages.forEach { message ->
+
+            if (
+                message.senderId !=
+                currentUserId &&
+                !message.readBy.contains(
+                    currentUserId
+                )
+            ) {
+
+                groupRepository.markGroupMessageAsRead(
+
+                    groupId =
+                        group.id,
+
+                    messageId =
+                        message.id,
+
+                    userId =
+                        currentUserId
+                )
+            }
+        }
+    }
+
+
+    // =========================================================
     // AUTOMATICALLY STOP TYPING
-
+    // =========================================================
 
     LaunchedEffect(
         messageText
     ) {
 
-        if (messageText.isNotBlank()) {
-
-            delay(2000)
+        if (messageText.isBlank()) {
 
             groupRepository.setTyping(
 
@@ -255,13 +301,48 @@ fun GroupChatScreen(
                 isTyping =
                     false
             )
+
+            return@LaunchedEffect
         }
+
+
+        // User is typing.
+
+        groupRepository.setTyping(
+
+            groupId =
+                group.id,
+
+            userId =
+                currentUserId,
+
+            isTyping =
+                true
+        )
+
+
+        delay(1500)
+
+
+        // User stopped typing.
+
+        groupRepository.setTyping(
+
+            groupId =
+                group.id,
+
+            userId =
+                currentUserId,
+
+            isTyping =
+                false
+        )
     }
 
 
-
+    // =========================================================
     // SCROLL TO LATEST MESSAGE
-
+    // =========================================================
 
     LaunchedEffect(
         messages.size
@@ -276,9 +357,9 @@ fun GroupChatScreen(
     }
 
 
-
+    // =========================================================
     // TYPING TEXT
-
+    // =========================================================
 
     val typingText: String? =
 
@@ -314,12 +395,14 @@ fun GroupChatScreen(
                 "$first and $second are typing..."
             }
 
-            else -> {
-
+            else ->
                 "${typingUsers.size} people are typing..."
-            }
         }
 
+
+    // =========================================================
+    // SCREEN
+    // =========================================================
 
     Scaffold(
 
@@ -327,8 +410,9 @@ fun GroupChatScreen(
             GroupBackground,
 
 
+        // =====================================================
         // TOP BAR
-
+        // =====================================================
 
         topBar = {
 
@@ -356,7 +440,7 @@ fun GroupChatScreen(
                     Icon(
 
                         imageVector =
-                            Icons.Default.ArrowBack,
+                            Icons.AutoMirrored.Filled.ArrowBack,
 
                         contentDescription =
                             "Back",
@@ -365,6 +449,7 @@ fun GroupChatScreen(
                             GroupText
                     )
                 }
+
 
                 Box(
 
@@ -395,10 +480,12 @@ fun GroupChatScreen(
                     )
                 }
 
+
                 Spacer(
                     modifier =
                         Modifier.size(12.dp)
                 )
+
 
                 Column {
 
@@ -419,17 +506,28 @@ fun GroupChatScreen(
                             GroupText
                     )
 
+
                     Text(
 
                         text =
-                            "${group.memberIds.size} members",
+                            typingText
+                                ?: "${group.memberIds.size} members",
 
                         fontSize =
                             12.sp,
 
+                        fontWeight =
+                            if (
+                                typingText != null
+                            ) {
+                                FontWeight.Medium
+                            } else {
+                                FontWeight.Normal
+                            },
+
                         color =
                             if (
-                                typingUsers.isNotEmpty()
+                                typingText != null
                             ) {
                                 GroupGreen
                             } else {
@@ -441,17 +539,17 @@ fun GroupChatScreen(
         },
 
 
-
+        // =====================================================
         // MESSAGE INPUT
-
+        // =====================================================
 
         bottomBar = {
 
             Column {
 
-
+                // =================================================
                 // TYPING INDICATOR
-
+                // =================================================
 
                 if (typingText != null) {
 
@@ -534,12 +632,14 @@ fun GroupChatScreen(
                             Modifier.weight(1f),
 
                         placeholder = {
+
                             Text(
                                 "Type a message..."
                             )
                         },
 
-                        singleLine = true,
+                        singleLine =
+                            true,
 
                         shape =
                             RoundedCornerShape(
@@ -560,10 +660,12 @@ fun GroupChatScreen(
                             )
                     )
 
+
                     Spacer(
                         modifier =
                             Modifier.size(8.dp)
                     )
+
 
                     IconButton(
 
@@ -575,6 +677,19 @@ fun GroupChatScreen(
                             if (text.isEmpty()) {
                                 return@IconButton
                             }
+
+
+                            // Stop typing.
+
+                            groupRepository.clearTypingStatus(
+
+                                groupId =
+                                    group.id,
+
+                                userId =
+                                    currentUserId
+                            )
+
 
                             groupRepository.sendGroupMessage(
 
@@ -591,18 +706,6 @@ fun GroupChatScreen(
 
                                     messageText =
                                         ""
-
-                                    groupRepository.setTyping(
-
-                                        groupId =
-                                            group.id,
-
-                                        userId =
-                                            currentUserId,
-
-                                        isTyping =
-                                            false
-                                    )
                                 },
 
                                 onError = { error ->
@@ -613,6 +716,9 @@ fun GroupChatScreen(
                             )
                         },
 
+                        enabled =
+                            messageText.isNotBlank(),
+
                         modifier =
                             Modifier
                                 .size(48.dp)
@@ -620,6 +726,7 @@ fun GroupChatScreen(
                                     CircleShape
                                 )
                                 .background(
+
                                     if (
                                         messageText.isNotBlank()
                                     ) {
@@ -633,7 +740,7 @@ fun GroupChatScreen(
                         Icon(
 
                             imageVector =
-                                Icons.Default.Send,
+                                Icons.AutoMirrored.Filled.Send,
 
                             contentDescription =
                                 "Send",
@@ -648,6 +755,7 @@ fun GroupChatScreen(
 
     ) { paddingValues ->
 
+
         Column(
 
             modifier =
@@ -659,8 +767,9 @@ fun GroupChatScreen(
         ) {
 
 
+            // =================================================
             // ERROR
-
+            // =================================================
 
             if (errorMessage != null) {
 
@@ -685,9 +794,9 @@ fun GroupChatScreen(
             }
 
 
-
+            // =================================================
             // EMPTY CHAT
-
+            // =================================================
 
             if (messages.isEmpty()) {
 
@@ -734,18 +843,16 @@ fun GroupChatScreen(
                                     GroupGreen,
 
                                 modifier =
-                                    Modifier.size(
-                                        38.dp
-                                    )
+                                    Modifier.size(38.dp)
                             )
                         }
 
+
                         Spacer(
                             modifier =
-                                Modifier.height(
-                                    16.dp
-                                )
+                                Modifier.height(16.dp)
                         )
+
 
                         Text(
 
@@ -762,12 +869,12 @@ fun GroupChatScreen(
                                 GroupText
                         )
 
+
                         Spacer(
                             modifier =
-                                Modifier.height(
-                                    5.dp
-                                )
+                                Modifier.height(5.dp)
                         )
+
 
                         Text(
 
@@ -786,8 +893,9 @@ fun GroupChatScreen(
             } else {
 
 
+                // =================================================
                 // MESSAGE LIST
-
+                // =================================================
 
                 LazyColumn(
 
@@ -819,10 +927,12 @@ fun GroupChatScreen(
 
                     ) { message ->
 
+
                         val sender =
                             usersById[
                                 message.senderId
                             ]
+
 
                         val senderName =
 
@@ -843,6 +953,34 @@ fun GroupChatScreen(
                                     ?: "Member"
                             }
 
+
+                        val isMine =
+                            message.senderId ==
+                                    currentUserId
+
+
+                        // Everyone except sender.
+
+                        val otherMembers =
+                            group.memberIds
+                                .filter {
+                                    it !=
+                                            message.senderId
+                                }
+
+
+                        // True only when EVERY
+                        // other member has read it.
+
+                        val allMembersRead =
+                            otherMembers.isNotEmpty() &&
+                                    otherMembers.all {
+                                        message.readBy.contains(
+                                            it
+                                        )
+                                    }
+
+
                         GroupMessageBubble(
 
                             message =
@@ -852,8 +990,10 @@ fun GroupChatScreen(
                                 senderName,
 
                             isMine =
-                                message.senderId ==
-                                        currentUserId
+                                isMine,
+
+                            allMembersRead =
+                                allMembersRead
                         )
                     }
                 }
@@ -863,9 +1003,9 @@ fun GroupChatScreen(
 }
 
 
-
+// =============================================================
 // GROUP MESSAGE BUBBLE
-
+// =============================================================
 
 @Composable
 private fun GroupMessageBubble(
@@ -874,7 +1014,9 @@ private fun GroupMessageBubble(
 
     senderName: String,
 
-    isMine: Boolean
+    isMine: Boolean,
+
+    allMembersRead: Boolean
 ) {
 
     Row(
@@ -913,6 +1055,11 @@ private fun GroupMessageBubble(
                     )
         ) {
 
+
+            // =================================================
+            // SENDER NAME
+            // =================================================
+
             Text(
 
                 text =
@@ -932,12 +1079,16 @@ private fun GroupMessageBubble(
                     }
             )
 
+
             Spacer(
                 modifier =
-                    Modifier.height(
-                        3.dp
-                    )
+                    Modifier.height(3.dp)
             )
+
+
+            // =================================================
+            // MESSAGE
+            // =================================================
 
             Text(
 
@@ -954,6 +1105,90 @@ private fun GroupMessageBubble(
                         GroupText
                     }
             )
+
+
+            // =================================================
+            // GROUP READ RECEIPT
+            // =================================================
+
+            if (isMine) {
+
+                Spacer(
+                    modifier =
+                        Modifier.height(3.dp)
+                )
+
+
+                Row(
+
+                    modifier =
+                        Modifier.align(
+                            Alignment.End
+                        ),
+
+                    verticalAlignment =
+                        Alignment.CenterVertically
+                ) {
+
+
+                    // FIRST TICK
+
+                    Icon(
+
+                        imageVector =
+                            Icons.Default.Done,
+
+                        contentDescription =
+                            "Message sent",
+
+                        modifier =
+                            Modifier.size(
+                                13.dp
+                            ),
+
+                        tint =
+                            if (allMembersRead) {
+                                ReadBlue
+                            } else {
+                                GroupLightGreen
+                            }
+                    )
+
+
+                    // SECOND TICK
+
+                    Icon(
+
+                        imageVector =
+                            Icons.Default.Done,
+
+                        contentDescription =
+                            if (
+                                allMembersRead
+                            ) {
+                                "Read by everyone"
+                            } else {
+                                "Delivered"
+                            },
+
+                        modifier =
+                            Modifier
+                                .size(
+                                    13.dp
+                                )
+                                .padding(
+                                    start = 0.dp
+                                ),
+
+                        tint =
+                            if (allMembersRead) {
+                                ReadBlue
+                            } else {
+                                GroupLightGreen
+                            }
+                    )
+                }
+            }
         }
     }
 }

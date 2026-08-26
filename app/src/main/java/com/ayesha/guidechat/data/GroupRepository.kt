@@ -1,57 +1,49 @@
 package com.ayesha.guidechat.data
 
+import android.content.Context
+import com.google.firebase.FirebaseApp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
-
-
-// =============================================================
-// GROUP MODEL
-// =============================================================
+import com.google.firebase.firestore.SetOptions
 
 data class GroupModel(
-
     val id: String = "",
-
     val name: String = "",
-
     val createdBy: String = "",
-
     val createdAt: Long = 0L,
-
-    val memberIds: List<String> =
-        emptyList()
+    val memberIds: List<String> = emptyList()
 )
-
-
-// =============================================================
-// GROUP MESSAGE MODEL
-// =============================================================
 
 data class GroupMessage(
-
     val id: String = "",
-
     val senderId: String = "",
-
     val text: String = "",
-
     val timestamp: Long = 0L,
-
-    val readBy: List<String> =
-        emptyList()
+    val readBy: List<String> = emptyList()
 )
 
+class GroupRepository(
+    context: Context
+) {
 
-class GroupRepository {
+    constructor() : this(
+        FirebaseApp
+            .getInstance()
+            .applicationContext
+    )
 
     private val db =
         FirebaseFirestore.getInstance()
 
+    private val encryptionManager =
+        EncryptionManager(
+            context.applicationContext
+        )
 
-
+    // =========================================================
     // CREATE GROUP
-
+    // =========================================================
 
     fun createGroup(
         name: String,
@@ -61,8 +53,7 @@ class GroupRepository {
         onError: (String) -> Unit
     ) {
 
-        val cleanName =
-            name.trim()
+        val cleanName = name.trim()
 
         if (cleanName.isEmpty()) {
 
@@ -74,8 +65,7 @@ class GroupRepository {
         }
 
         val allMembers =
-            (memberIds + createdBy)
-                .distinct()
+            (memberIds + createdBy).distinct()
 
         if (allMembers.size < 2) {
 
@@ -90,21 +80,20 @@ class GroupRepository {
             db.collection("groups")
                 .document()
 
-        val group =
-            hashMapOf(
+        val group = hashMapOf(
 
-                "name" to
-                        cleanName,
+            "name" to cleanName,
 
-                "createdBy" to
-                        createdBy,
+            "createdBy" to createdBy,
 
-                "createdAt" to
-                        System.currentTimeMillis(),
+            "createdAt" to
+                    System.currentTimeMillis(),
 
-                "memberIds" to
-                        allMembers
-            )
+            "memberIds" to allMembers,
+
+            "typing" to
+                    emptyMap<String, Boolean>()
+        )
 
         groupRef
             .set(group)
@@ -123,10 +112,9 @@ class GroupRepository {
             }
     }
 
-
-
-    // REAL-TIME GROUP LISTENER
-
+    // =========================================================
+    // LIST GROUPS
+    // =========================================================
 
     fun listenToGroups(
         currentUserId: String,
@@ -141,10 +129,7 @@ class GroupRepository {
                 "memberIds",
                 currentUserId
             )
-            .addSnapshotListener {
-
-                    snapshot,
-                    exception ->
+            .addSnapshotListener { snapshot, exception ->
 
                 if (exception != null) {
 
@@ -156,15 +141,14 @@ class GroupRepository {
                     return@addSnapshotListener
                 }
 
-                val groups =
+                val groups: List<GroupModel> =
                     snapshot
                         ?.documents
                         ?.map { document ->
 
                             GroupModel(
 
-                                id =
-                                    document.id,
+                                id = document.id,
 
                                 name =
                                     document.getString(
@@ -204,10 +188,9 @@ class GroupRepository {
             }
     }
 
-
-
-    // SEND GROUP MESSAGE
-
+    // =========================================================
+    // SEND ENCRYPTED GROUP MESSAGE
+    // =========================================================
 
     fun sendGroupMessage(
         groupId: String,
@@ -217,8 +200,7 @@ class GroupRepository {
         onError: (String) -> Unit
     ) {
 
-        val cleanText =
-            text.trim()
+        val cleanText = text.trim()
 
         if (cleanText.isEmpty()) {
 
@@ -229,51 +211,61 @@ class GroupRepository {
             return
         }
 
-        val messageRef =
-            db.collection("groups")
-                .document(groupId)
-                .collection("messages")
-                .document()
+        try {
 
-        val timestamp =
-            System.currentTimeMillis()
+            val encryptedText =
+                encryptionManager.encrypt(
+                    plainText = cleanText,
+                    userId1 = groupId,
+                    userId2 = groupId
+                )
 
-        val message =
-            hashMapOf(
+            val timestamp =
+                System.currentTimeMillis()
 
-                "senderId" to
-                        senderId,
+            val messageRef =
+                db.collection("groups")
+                    .document(groupId)
+                    .collection("messages")
+                    .document()
 
-                "text" to
-                        cleanText,
+            val message = hashMapOf(
 
-                "timestamp" to
-                        timestamp,
+                "senderId" to senderId,
 
-                // Sender has already seen their own message.
-                "readBy" to
-                        listOf(senderId)
+                "text" to encryptedText,
+
+                "timestamp" to timestamp,
+
+                "readBy" to listOf(senderId)
             )
 
-        messageRef
-            .set(message)
-            .addOnSuccessListener {
+            messageRef
+                .set(message)
+                .addOnSuccessListener {
 
-                onSuccess()
-            }
-            .addOnFailureListener { exception ->
+                    onSuccess()
+                }
+                .addOnFailureListener { exception ->
 
-                onError(
-                    exception.message
-                        ?: "Unable to send group message"
-                )
-            }
+                    onError(
+                        exception.message
+                            ?: "Unable to send group message"
+                    )
+                }
+
+        } catch (exception: Exception) {
+
+            onError(
+                exception.message
+                    ?: "Unable to encrypt group message"
+            )
+        }
     }
 
-
-
-    // REAL-TIME GROUP MESSAGE LISTENER
-
+    // =========================================================
+    // LISTEN TO GROUP MESSAGES
+    // =========================================================
 
     fun listenToGroupMessages(
         groupId: String,
@@ -290,10 +282,7 @@ class GroupRepository {
                 "timestamp",
                 Query.Direction.ASCENDING
             )
-            .addSnapshotListener {
-
-                    snapshot,
-                    exception ->
+            .addSnapshotListener { snapshot, exception ->
 
                 if (exception != null) {
 
@@ -305,15 +294,31 @@ class GroupRepository {
                     return@addSnapshotListener
                 }
 
-                val messages =
+                val messages: List<GroupMessage> =
                     snapshot
                         ?.documents
                         ?.map { document ->
 
+                            val encryptedText =
+                                document.getString(
+                                    "text"
+                                )
+                                    ?: ""
+
+                            val decryptedText =
+                                if (encryptedText.isEmpty()) {
+                                    ""
+                                } else {
+                                    encryptionManager.decrypt(
+                                        encryptedText = encryptedText,
+                                        userId1 = groupId,
+                                        userId2 = groupId
+                                    )
+                                }
+
                             GroupMessage(
 
-                                id =
-                                    document.id,
+                                id = document.id,
 
                                 senderId =
                                     document.getString(
@@ -322,10 +327,7 @@ class GroupRepository {
                                         ?: "",
 
                                 text =
-                                    document.getString(
-                                        "text"
-                                    )
-                                        ?: "",
+                                    decryptedText,
 
                                 timestamp =
                                     document.getLong(
@@ -345,15 +347,13 @@ class GroupRepository {
                         }
                         ?: emptyList()
 
-
                 onMessagesChanged(messages)
             }
     }
 
-
-
+    // =========================================================
     // MARK GROUP MESSAGE AS READ
-
+    // =========================================================
 
     fun markGroupMessageAsRead(
         groupId: String,
@@ -381,11 +381,7 @@ class GroupRepository {
                     ?.filterIsInstance<String>()
                     ?: emptyList()
 
-            if (
-                !currentReadBy.contains(
-                    userId
-                )
-            ) {
+            if (!currentReadBy.contains(userId)) {
 
                 transaction.update(
                     messageRef,
@@ -393,14 +389,77 @@ class GroupRepository {
                     currentReadBy + userId
                 )
             }
+
+            null
         }
     }
 
+    // =========================================================
+    // SET GROUP TYPING STATUS
+    // =========================================================
 
+    fun setTyping(
+        groupId: String,
+        userId: String,
+        isTyping: Boolean
+    ) {
 
-    // REAL-TIME GROUP TYPING LISTENER
+        val groupRef =
+            db.collection("groups")
+                .document(groupId)
 
+        db.runTransaction { transaction ->
 
+            val snapshot =
+                transaction.get(groupRef)
+
+            val currentTyping =
+                (
+                        snapshot.get(
+                            "typing"
+                        ) as? Map<*, *>
+                        )
+                    ?.mapNotNull { entry ->
+
+                        val key =
+                            entry.key as? String
+
+                        val value =
+                            entry.value as? Boolean
+
+                        if (
+                            key != null &&
+                            value != null
+                        ) {
+                            key to value
+                        } else {
+                            null
+                        }
+                    }
+                    ?.toMap()
+                    ?: emptyMap()
+
+            val updatedTyping =
+                currentTyping.toMutableMap()
+
+            updatedTyping[userId] =
+                isTyping
+
+            transaction.set(
+                groupRef,
+                mapOf(
+                    "typing" to updatedTyping
+                ),
+                SetOptions.merge()
+            )
+
+            null
+        }
+    }
+
+    // =========================================================
+    // LISTEN TO GROUP TYPING
+    // =========================================================
 
     fun listenToGroupTyping(
         groupId: String,
@@ -413,11 +472,7 @@ class GroupRepository {
 
         return db.collection("groups")
             .document(groupId)
-            .collection("typing")
-            .addSnapshotListener {
-
-                    snapshot,
-                    exception ->
+            .addSnapshotListener { snapshot, exception ->
 
                 if (exception != null) {
 
@@ -429,32 +484,30 @@ class GroupRepository {
                     return@addSnapshotListener
                 }
 
+                val typingMap =
+                    snapshot?.get("typing")
+                            as? Map<*, *>
+
                 val typingUsers =
-                    snapshot
-                        ?.documents
-                        ?.filter { document ->
+                    typingMap
+                        ?.mapNotNull { entry ->
 
                             val userId =
-                                document.getString(
-                                    "userId"
-                                )
-                                    ?: document.id
+                                entry.key as? String
 
                             val isTyping =
-                                document.getBoolean(
-                                    "isTyping"
-                                )
+                                entry.value as? Boolean
                                     ?: false
 
-                            userId != currentUserId &&
-                                    isTyping
-                        }
-                        ?.map { document ->
-
-                            document.getString(
-                                "userId"
-                            )
-                                ?: document.id
+                            if (
+                                userId != null &&
+                                userId != currentUserId &&
+                                isTyping
+                            ) {
+                                userId
+                            } else {
+                                null
+                            }
                         }
                         ?: emptyList()
 
@@ -464,44 +517,9 @@ class GroupRepository {
             }
     }
 
-
-
-    // SET GROUP TYPING STATUS
-
-
-    fun setTyping(
-        groupId: String,
-        userId: String,
-        isTyping: Boolean
-    ) {
-
-        val typingRef =
-            db.collection("groups")
-                .document(groupId)
-                .collection("typing")
-                .document(userId)
-
-        val data =
-            hashMapOf(
-
-                "userId" to
-                        userId,
-
-                "isTyping" to
-                        isTyping,
-
-                "timestamp" to
-                        System.currentTimeMillis()
-            )
-
-        typingRef
-            .set(data)
-    }
-
-
-
+    // =========================================================
     // CLEAR GROUP TYPING STATUS
-
+    // =========================================================
 
     fun clearTypingStatus(
         groupId: String,
@@ -509,14 +527,9 @@ class GroupRepository {
     ) {
 
         setTyping(
-            groupId =
-                groupId,
-
-            userId =
-                userId,
-
-            isTyping =
-                false
+            groupId = groupId,
+            userId = userId,
+            isTyping = false
         )
     }
 }
