@@ -1,5 +1,6 @@
 package com.ayesha.guidechat.data
 
+import android.content.Context
 import com.ayesha.guidechat.ui.ChatPreview
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
@@ -7,17 +8,33 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-class ConversationRepository {
+class ConversationRepository(
+    context: Context
+) {
 
     private val db =
         FirebaseFirestore.getInstance()
 
+    // =========================================================
+    // ENCRYPTION MANAGER
+    // =========================================================
+
+    private val encryptionManager =
+        EncryptionManager(
+            context.applicationContext
+        )
+
+
+    // =========================================================
+    // LISTEN FOR CONVERSATIONS
+    // =========================================================
 
     fun listenForConversations(
         currentUserId: String,
         onConversationsChanged:
             (List<ChatPreview>) -> Unit,
-        onError: (String) -> Unit
+        onError:
+            (String) -> Unit
     ): ListenerRegistration {
 
         return db.collection("conversations")
@@ -55,6 +72,11 @@ class ConversationRepository {
 
                 var completed = 0
 
+
+                // =================================================
+                // PROCESS EACH CONVERSATION
+                // =================================================
+
                 documents.forEach { document ->
 
                     val participants =
@@ -68,6 +90,11 @@ class ConversationRepository {
                             .firstOrNull {
                                 it != currentUserId
                             }
+
+
+                    // -------------------------------------------------
+                    // INVALID CONVERSATION
+                    // -------------------------------------------------
 
                     if (otherUserId == null) {
 
@@ -87,9 +114,11 @@ class ConversationRepository {
                         return@forEach
                     }
 
-                    /*
-                     * Get the other user's profile.
-                     */
+
+                    // =================================================
+                    // GET OTHER USER PROFILE
+                    // =================================================
+
                     db.collection("users")
                         .document(otherUserId)
                         .get()
@@ -105,10 +134,62 @@ class ConversationRepository {
                                     .getBoolean("isOnline")
                                     ?: false
 
-                            val lastMessage =
+
+                            // =================================================
+                            // GET ENCRYPTED LAST MESSAGE
+                            // =================================================
+
+                            val encryptedLastMessage =
                                 document
                                     .getString("lastMessage")
                                     ?: ""
+
+
+                            // =================================================
+                            // DECRYPT LAST MESSAGE
+                            // =================================================
+
+                            val lastMessage =
+                                if (
+                                    encryptedLastMessage.isBlank()
+                                ) {
+
+                                    ""
+
+                                } else {
+
+                                    try {
+
+                                        encryptionManager.decrypt(
+
+                                            encryptedText =
+                                                encryptedLastMessage,
+
+                                            userId1 =
+                                                currentUserId,
+
+                                            userId2 =
+                                                otherUserId
+                                        )
+
+                                    } catch (
+                                        exception: Exception
+                                    ) {
+
+                                        /*
+                                         * If an old conversation contains
+                                         * a message that cannot be decrypted,
+                                         * don't crash the Home screen.
+                                         */
+
+                                        ""
+                                    }
+                                }
+
+
+                            // =================================================
+                            // TIMESTAMP
+                            // =================================================
 
                             val timestamp =
                                 document
@@ -117,6 +198,10 @@ class ConversationRepository {
                                     )
                                     ?: 0L
 
+
+                            // =================================================
+                            // UNREAD MESSAGE COUNT
+                            // =================================================
 
                             db.collection("conversations")
                                 .document(document.id)
@@ -130,10 +215,17 @@ class ConversationRepository {
                                     false
                                 )
                                 .get()
-                                .addOnSuccessListener { unreadSnapshot ->
+                                .addOnSuccessListener {
+
+                                        unreadSnapshot ->
 
                                     val unreadCount =
                                         unreadSnapshot.size()
+
+
+                                    // =================================================
+                                    // CREATE CHAT PREVIEW
+                                    // =================================================
 
                                     previews[otherUserId] =
                                         ChatPreview(
@@ -165,6 +257,7 @@ class ConversationRepository {
                                                 false
                                         )
 
+
                                     completed++
 
                                     if (
@@ -178,12 +271,14 @@ class ConversationRepository {
                                         )
                                     }
                                 }
-                                .addOnFailureListener { error ->
+
+                                .addOnFailureListener {
 
                                     /*
-                                     * If unread count fails,
-                                     * still show the conversation.
+                                     * Even if unread-count loading
+                                     * fails, show the conversation.
                                      */
+
                                     previews[otherUserId] =
                                         ChatPreview(
 
@@ -214,6 +309,7 @@ class ConversationRepository {
                                                 false
                                         )
 
+
                                     completed++
 
                                     if (
@@ -228,6 +324,7 @@ class ConversationRepository {
                                     }
                                 }
                         }
+
                         .addOnFailureListener { error ->
 
                             completed++
@@ -253,6 +350,10 @@ class ConversationRepository {
     }
 
 
+    // =========================================================
+    // PUBLISH CONVERSATIONS
+    // =========================================================
+
     private fun publish(
         previews:
         Map<String, ChatPreview>,
@@ -272,9 +373,11 @@ class ConversationRepository {
         )
     }
 
-    /*
-     * Format message timestamp.
-     */
+
+    // =========================================================
+    // FORMAT MESSAGE TIME
+    // =========================================================
+
     private fun formatTime(
         timestamp: Long
     ): String {
@@ -290,13 +393,17 @@ class ConversationRepository {
             SimpleDateFormat(
                 "yyyyMMdd",
                 Locale.getDefault()
-            ).format(Date())
+            ).format(
+                Date()
+            )
 
         val messageDay =
             SimpleDateFormat(
                 "yyyyMMdd",
                 Locale.getDefault()
-            ).format(messageDate)
+            ).format(
+                messageDate
+            )
 
         return if (
             today == messageDay
@@ -305,14 +412,18 @@ class ConversationRepository {
             SimpleDateFormat(
                 "hh:mm a",
                 Locale.getDefault()
-            ).format(messageDate)
+            ).format(
+                messageDate
+            )
 
         } else {
 
             SimpleDateFormat(
                 "dd MMM",
                 Locale.getDefault()
-            ).format(messageDate)
+            ).format(
+                messageDate
+            )
         }
     }
 }

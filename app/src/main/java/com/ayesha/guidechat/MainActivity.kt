@@ -1,7 +1,6 @@
 package com.ayesha.guidechat
 
-import com.ayesha.guidechat.ui.GroupChatScreen
-import com.ayesha.guidechat.data.GroupRepository
+import androidx.compose.ui.platform.LocalContext
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -52,6 +51,7 @@ import androidx.compose.ui.unit.sp
 import com.ayesha.guidechat.data.AuthRepository
 import com.ayesha.guidechat.data.ConversationRepository
 import com.ayesha.guidechat.data.GroupModel
+import com.ayesha.guidechat.data.NotificationRepository
 import com.ayesha.guidechat.data.UserRepository
 import com.ayesha.guidechat.model.UserProfile
 import com.ayesha.guidechat.ui.ChatPreview
@@ -62,6 +62,7 @@ import com.ayesha.guidechat.ui.HomeScreen
 import com.ayesha.guidechat.ui.UserSearchScreen
 import com.ayesha.guidechat.ui.theme.GuideChatTheme
 import com.google.firebase.auth.FirebaseAuth
+
 
 class MainActivity : ComponentActivity() {
 
@@ -82,47 +83,107 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun GuideChatApp() {
 
-    val context = LocalContext.current
+    // =========================================================
+    // NAVIGATION
+    // =========================================================
 
     var currentScreen by remember {
         mutableStateOf("login")
     }
 
+
+    // =========================================================
+    // CURRENT USER PROFILE
+    // =========================================================
+
     var currentUserProfile by remember {
         mutableStateOf<UserProfile?>(null)
     }
+
+
+    // =========================================================
+    // SELECTED USER
+    // =========================================================
 
     var selectedUser by remember {
         mutableStateOf<UserProfile?>(null)
     }
 
 
-    // SELECTED GROUP
+    // =========================================================
+    // SELECTED CHAT USER
+    // =========================================================
+    // These values are used when opening ChatScreen.
 
+    var selectedChatUserId by remember {
+        mutableStateOf("")
+    }
+
+    var selectedChatUserName by remember {
+        mutableStateOf("")
+    }
+
+
+    // =========================================================
+    // SELECTED GROUP
+    // =========================================================
 
     var selectedGroup by remember {
         mutableStateOf<GroupModel?>(null)
     }
 
 
+    // =========================================================
     // REPOSITORIES
+    // =========================================================
 
+    val context = LocalContext.current
 
     val userRepository = remember {
         UserRepository()
     }
 
-    val conversationRepository = remember {
-        ConversationRepository()
+    val conversationRepository = remember(context) {
+        ConversationRepository(context)
     }
 
-    val groupRepository = remember {
-        GroupRepository()
+    val notificationRepository = remember {
+        NotificationRepository()
     }
 
 
+    // =========================================================
+    // CURRENT FIREBASE USER
+    // =========================================================
+
+    val loggedInFirebaseUser =
+        FirebaseAuth.getInstance().currentUser
+
+
+    // =========================================================
+    // REGISTER DEVICE FOR NOTIFICATIONS
+    // =========================================================
+
+    LaunchedEffect(loggedInFirebaseUser?.uid) {
+
+        if (loggedInFirebaseUser != null) {
+
+            notificationRepository.registerCurrentDevice(
+                onSuccess = {
+                    // FCM token registered successfully.
+                },
+
+                onError = {
+                    // Keep notification errors silent.
+                }
+            )
+        }
+    }
+
+
+    // =========================================================
     // CONVERSATIONS
-
+    // =========================================================
 
     var conversations by remember {
         mutableStateOf<List<ChatPreview>>(emptyList())
@@ -137,15 +198,14 @@ fun GuideChatApp() {
     }
 
 
-    // CONVERSATION LISTENER
-
+    // =========================================================
+    // LISTEN FOR CONVERSATIONS
+    // =========================================================
 
     DisposableEffect(currentScreen) {
 
         val firebaseUser =
-            FirebaseAuth
-                .getInstance()
-                .currentUser
+            FirebaseAuth.getInstance().currentUser
 
         if (
             currentScreen == "home" &&
@@ -153,6 +213,7 @@ fun GuideChatApp() {
         ) {
 
             isLoadingConversations = true
+
             conversationError = null
 
             val listener =
@@ -165,24 +226,21 @@ fun GuideChatApp() {
 
                         conversations = result
 
-                        isLoadingConversations =
-                            false
+                        isLoadingConversations = false
 
-                        conversationError =
-                            null
+                        conversationError = null
                     },
 
                     onError = { error ->
 
-                        isLoadingConversations =
-                            false
+                        isLoadingConversations = false
 
-                        conversationError =
-                            error
+                        conversationError = error
                     }
                 )
 
             onDispose {
+
                 listener.remove()
             }
 
@@ -193,32 +251,31 @@ fun GuideChatApp() {
     }
 
 
+    // =========================================================
     // LOAD CURRENT USER PROFILE
-
+    // =========================================================
 
     LaunchedEffect(currentScreen) {
 
         if (currentScreen == "home") {
 
             val firebaseUser =
-                FirebaseAuth
-                    .getInstance()
-                    .currentUser
+                FirebaseAuth.getInstance().currentUser
 
             if (firebaseUser != null) {
 
                 userRepository.getUserProfile(
 
-                    uid = firebaseUser.uid,
+                    uid =
+                        firebaseUser.uid,
 
                     onSuccess = { profile ->
 
-                        currentUserProfile =
-                            profile
+                        currentUserProfile = profile
                     },
 
                     onError = {
-                        // Keep generic User fallback
+                        // Keep generic fallback.
                     }
                 )
             }
@@ -226,14 +283,16 @@ fun GuideChatApp() {
     }
 
 
+    // =========================================================
     // NAVIGATION
-
+    // =========================================================
 
     when (currentScreen) {
 
 
+        // =====================================================
         // LOGIN
-
+        // =====================================================
 
         "login" -> {
 
@@ -242,7 +301,13 @@ fun GuideChatApp() {
                 onLoginSuccess = {
 
                     currentUserProfile = null
+
                     selectedUser = null
+
+                    selectedChatUserId = ""
+
+                    selectedChatUserName = ""
+
                     selectedGroup = null
 
                     currentScreen = "home"
@@ -256,8 +321,9 @@ fun GuideChatApp() {
         }
 
 
+        // =====================================================
         // REGISTER
-
+        // =====================================================
 
         "register" -> {
 
@@ -271,25 +337,16 @@ fun GuideChatApp() {
         }
 
 
+        // =====================================================
         // HOME
-
+        // =====================================================
 
         "home" -> {
 
-            val displayName =
-                currentUserProfile
-                    ?.name
-                    ?.trim()
-                    ?.takeIf {
-                        it.isNotEmpty()
-                    }
-                    ?: "User"
-
             HomeScreen(
 
-                userName = displayName,
-
-                conversations = conversations,
+                conversations =
+                    conversations,
 
                 isLoadingConversations =
                     isLoadingConversations,
@@ -297,10 +354,27 @@ fun GuideChatApp() {
                 conversationError =
                     conversationError,
 
+
+                // =================================================
+                // WHEN EXISTING CHAT IS CLICKED
+                // =================================================
+
                 onChatClick = { chat ->
 
-                    // Existing chat handling
+                    selectedChatUserId =
+                        chat.userId
+
+                    selectedChatUserName =
+                        chat.name
+
+                    currentScreen =
+                        "chat"
                 },
+
+
+                // =================================================
+                // + BUTTON
+                // =================================================
 
                 onNewChatClick = {
 
@@ -308,11 +382,21 @@ fun GuideChatApp() {
                         "userSearch"
                 },
 
+
+                // =================================================
+                // SEARCH
+                // =================================================
+
                 onSearchClick = {
 
                     currentScreen =
                         "userSearch"
                 },
+
+
+                // =================================================
+                // GROUPS
+                // =================================================
 
                 onGroupsClick = {
 
@@ -323,15 +407,14 @@ fun GuideChatApp() {
         }
 
 
+        // =====================================================
         // USER SEARCH
-
+        // =====================================================
 
         "userSearch" -> {
 
             val firebaseUser =
-                FirebaseAuth
-                    .getInstance()
-                    .currentUser
+                FirebaseAuth.getInstance().currentUser
 
             if (firebaseUser != null) {
 
@@ -348,9 +431,19 @@ fun GuideChatApp() {
 
                     onUserSelected = { user ->
 
+                        // Save selected user.
                         selectedUser =
                             user
 
+                        // IMPORTANT:
+                        // Save ID and name so ChatScreen can open.
+                        selectedChatUserId =
+                            user.uid
+
+                        selectedChatUserName =
+                            user.name
+
+                        // Open chat immediately.
                         currentScreen =
                             "chat"
                     }
@@ -364,8 +457,9 @@ fun GuideChatApp() {
         }
 
 
+        // =====================================================
         // ONE-TO-ONE CHAT
-
+        // =====================================================
 
         "chat" -> {
 
@@ -374,12 +468,9 @@ fun GuideChatApp() {
                     .getInstance()
                     .currentUser
 
-            val otherUser =
-                selectedUser
-
             if (
                 firebaseUser != null &&
-                otherUser != null
+                selectedChatUserId.isNotBlank()
             ) {
 
                 ChatScreen(
@@ -387,21 +478,16 @@ fun GuideChatApp() {
                     currentUserId =
                         firebaseUser.uid,
 
-                    currentUserName =
-                        currentUserProfile
-                            ?.name
-                            ?.ifBlank {
-                                "User"
-                            }
-                            ?: "User",
+                    otherUserId =
+                        selectedChatUserId,
 
-                    otherUser =
-                        otherUser,
+                    otherUserName =
+                        selectedChatUserName,
 
                     onBack = {
 
                         currentScreen =
-                            "userSearch"
+                            "home"
                     }
                 )
 
@@ -413,8 +499,9 @@ fun GuideChatApp() {
         }
 
 
+        // =====================================================
         // GROUP LIST
-
+        // =====================================================
 
         "groups" -> {
 
@@ -444,9 +531,11 @@ fun GuideChatApp() {
 
                     onGroupClick = { group ->
 
-                        selectedGroup = group
+                        selectedGroup =
+                            group
 
-                        currentScreen = "groupChat"
+                        // Group chat screen can be connected here
+                        // when the GroupChatScreen is added.
                     }
                 )
 
@@ -457,46 +546,10 @@ fun GuideChatApp() {
             }
         }
 
-// GROUP CHAT
 
-
-        "groupChat" -> {
-
-            val firebaseUser =
-                FirebaseAuth
-                    .getInstance()
-                    .currentUser
-
-            val group =
-                selectedGroup
-
-            if (
-                firebaseUser != null &&
-                group != null
-            ) {
-
-                GroupChatScreen(
-
-                    group = group,
-
-                    currentUserId =
-                        firebaseUser.uid,
-
-                    onBack = {
-
-                        currentScreen = "groups"
-                    }
-                )
-
-            } else {
-
-                currentScreen = "groups"
-            }
-        }
-
-
+        // =====================================================
         // CREATE GROUP
-
+        // =====================================================
 
         "createGroup" -> {
 
@@ -515,80 +568,16 @@ fun GuideChatApp() {
                     onBack = {
 
                         currentScreen =
-                            "groups"
+                            "home"
                     },
 
                     onGroupCreated = {
-                            _,
+                            groupId,
                             groupName,
                             memberIds ->
 
-
-                        // CREATE REAL FIRESTORE GROUP
-
-
-                        groupRepository.createGroup(
-
-                            name =
-                                groupName,
-
-                            createdBy =
-                                firebaseUser.uid,
-
-                            memberIds =
-                                memberIds,
-
-                            onSuccess = { createdGroupId ->
-
-
-                                // SAVE SELECTED GROUP LOCALLY
-
-
-                                selectedGroup =
-                                    GroupModel(
-
-                                        id =
-                                            createdGroupId,
-
-                                        name =
-                                            groupName,
-
-                                        createdBy =
-                                            firebaseUser.uid,
-
-                                        createdAt =
-                                            System
-                                                .currentTimeMillis(),
-
-                                        memberIds =
-                                            memberIds
-                                    )
-
-
-                                // SUCCESS MESSAGE
-
-
-                                Toast.makeText(
-                                    context,
-                                    "Group created successfully!",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-
-
-
-                                currentScreen =
-                                    "groups"
-                            },
-
-                            onError = { error ->
-
-                                Toast.makeText(
-                                    context,
-                                    error,
-                                    Toast.LENGTH_LONG
-                                ).show()
-                            }
-                        )
+                        currentScreen =
+                            "home"
                     }
                 )
 
@@ -600,8 +589,9 @@ fun GuideChatApp() {
         }
 
 
+        // =====================================================
         // FALLBACK
-
+        // =====================================================
 
         else -> {
 
@@ -612,8 +602,9 @@ fun GuideChatApp() {
 }
 
 
-  // LOGIN SCREEN
-
+// =============================================================
+// LOGIN SCREEN
+// =============================================================
 
 @Composable
 fun LoginScreen(
@@ -621,11 +612,13 @@ fun LoginScreen(
     onCreateAccount: () -> Unit
 ) {
 
-    val context = LocalContext.current
+    val context =
+        LocalContext.current
 
-    val authRepository = remember {
-        AuthRepository()
-    }
+    val authRepository =
+        remember {
+            AuthRepository()
+        }
 
     var email by remember {
         mutableStateOf("")
@@ -639,16 +632,24 @@ fun LoginScreen(
         mutableStateOf(false)
     }
 
+
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFF8FBF9))
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Color(0xFFF8FBF9)
+                )
     ) {
 
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 24.dp),
+
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(
+                        horizontal = 24.dp
+                    ),
 
             horizontalAlignment =
                 Alignment.CenterHorizontally,
@@ -657,37 +658,51 @@ fun LoginScreen(
                 Arrangement.Center
         ) {
 
+
+            // LOGO
+
             Box(
-                modifier = Modifier
-                    .size(82.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFCFFDDC)),
+
+                modifier =
+                    Modifier
+                        .size(82.dp)
+                        .clip(CircleShape)
+                        .background(
+                            Color(0xFFCFFDDC)
+                        ),
 
                 contentAlignment =
                     Alignment.Center
             ) {
 
                 Text(
+
                     text = "G",
 
                     color =
                         Color(0xFF2E6F40),
 
-                    fontSize = 38.sp,
+                    fontSize =
+                        38.sp,
 
                     fontWeight =
                         FontWeight.Bold
                 )
             }
 
+
             Spacer(
-                modifier = Modifier.height(18.dp)
+                modifier =
+                    Modifier.height(18.dp)
             )
 
+
             Text(
+
                 text = "GuideChat",
 
-                fontSize = 30.sp,
+                fontSize =
+                    30.sp,
 
                 fontWeight =
                     FontWeight.Bold,
@@ -696,25 +711,34 @@ fun LoginScreen(
                     Color(0xFF253D2C)
             )
 
+
             Spacer(
-                modifier = Modifier.height(6.dp)
+                modifier =
+                    Modifier.height(6.dp)
             )
 
+
             Text(
+
                 text =
                     "Connect • Collaborate • Grow",
 
-                fontSize = 14.sp,
+                fontSize =
+                    14.sp,
 
                 color =
                     Color(0xFF68BA7F)
             )
 
+
             Spacer(
-                modifier = Modifier.height(30.dp)
+                modifier =
+                    Modifier.height(30.dp)
             )
 
+
             Card(
+
                 modifier =
                     Modifier.fillMaxWidth(),
 
@@ -729,20 +753,25 @@ fun LoginScreen(
 
                 elevation =
                     CardDefaults.cardElevation(
-                        defaultElevation = 5.dp
+                        defaultElevation =
+                            5.dp
                     )
             ) {
 
                 Column(
+
                     modifier =
                         Modifier.padding(22.dp)
                 ) {
 
+
                     Text(
+
                         text =
                             "Welcome Back 👋",
 
-                        fontSize = 22.sp,
+                        fontSize =
+                            22.sp,
 
                         fontWeight =
                             FontWeight.Bold,
@@ -751,28 +780,38 @@ fun LoginScreen(
                             Color(0xFF253D2C)
                     )
 
+
                     Spacer(
                         modifier =
                             Modifier.height(6.dp)
                     )
 
+
                     Text(
+
                         text =
                             "Sign in to continue your conversations",
 
-                        fontSize = 14.sp,
+                        fontSize =
+                            14.sp,
 
                         color =
                             Color(0xFF6B756E)
                     )
+
 
                     Spacer(
                         modifier =
                             Modifier.height(22.dp)
                     )
 
+
+                    // EMAIL
+
                     OutlinedTextField(
-                        value = email,
+
+                        value =
+                            email,
 
                         onValueChange = {
                             email = it
@@ -802,6 +841,7 @@ fun LoginScreen(
 
                         colors =
                             OutlinedTextFieldDefaults.colors(
+
                                 focusedBorderColor =
                                     Color(0xFF2E6F40),
 
@@ -816,13 +856,19 @@ fun LoginScreen(
                             )
                     )
 
+
                     Spacer(
                         modifier =
                             Modifier.height(14.dp)
                     )
 
+
+                    // PASSWORD
+
                     OutlinedTextField(
-                        value = password,
+
+                        value =
+                            password,
 
                         onValueChange = {
                             password = it
@@ -843,8 +889,11 @@ fun LoginScreen(
 
                         visualTransformation =
                             if (passwordVisible) {
+
                                 VisualTransformation.None
+
                             } else {
+
                                 PasswordVisualTransformation()
                             },
 
@@ -857,6 +906,7 @@ fun LoginScreen(
                         trailingIcon = {
 
                             TextButton(
+
                                 onClick = {
 
                                     passwordVisible =
@@ -865,6 +915,7 @@ fun LoginScreen(
                             ) {
 
                                 Text(
+
                                     text =
                                         if (passwordVisible) {
                                             "Hide"
@@ -873,10 +924,7 @@ fun LoginScreen(
                                         },
 
                                     color =
-                                        Color(0xFF2E6F40),
-
-                                    fontWeight =
-                                        FontWeight.Medium
+                                        Color(0xFF2E6F40)
                                 )
                             }
                         },
@@ -886,6 +934,7 @@ fun LoginScreen(
 
                         colors =
                             OutlinedTextFieldDefaults.colors(
+
                                 focusedBorderColor =
                                     Color(0xFF2E6F40),
 
@@ -900,18 +949,25 @@ fun LoginScreen(
                             )
                     )
 
+
                     Spacer(
                         modifier =
                             Modifier.height(8.dp)
                     )
 
+
                     TextButton(
+
                         onClick = {
 
                             Toast.makeText(
+
                                 context,
+
                                 "Password reset will be added soon",
+
                                 Toast.LENGTH_SHORT
+
                             ).show()
                         },
 
@@ -922,60 +978,81 @@ fun LoginScreen(
                     ) {
 
                         Text(
+
                             text =
                                 "Forgot password?",
 
                             color =
                                 Color(0xFF2E6F40),
 
-                            fontSize = 13.sp
+                            fontSize =
+                                13.sp
                         )
                     }
+
 
                     Spacer(
                         modifier =
                             Modifier.height(8.dp)
                     )
 
+
                     Button(
+
                         onClick = {
 
                             if (email.isBlank()) {
 
                                 Toast.makeText(
+
                                     context,
+
                                     "Please enter your email",
+
                                     Toast.LENGTH_SHORT
+
                                 ).show()
 
                                 return@Button
                             }
+
 
                             if (password.isBlank()) {
 
                                 Toast.makeText(
+
                                     context,
+
                                     "Please enter your password",
+
                                     Toast.LENGTH_SHORT
+
                                 ).show()
 
                                 return@Button
                             }
 
+
                             authRepository.login(
+
                                 email =
                                     email.trim(),
 
                                 password =
                                     password
+
                             ) { success, error ->
 
                                 if (success) {
 
                                     Toast.makeText(
+
                                         context,
+
                                         "Login successful!",
+
                                         Toast.LENGTH_SHORT
+
                                     ).show()
 
                                     onLoginSuccess()
@@ -983,10 +1060,14 @@ fun LoginScreen(
                                 } else {
 
                                     Toast.makeText(
+
                                         context,
+
                                         error
                                             ?: "Login failed",
+
                                         Toast.LENGTH_LONG
+
                                     ).show()
                                 }
                             }
@@ -1002,6 +1083,7 @@ fun LoginScreen(
 
                         colors =
                             ButtonDefaults.buttonColors(
+
                                 containerColor =
                                     Color(0xFF2E6F40),
 
@@ -1011,22 +1093,27 @@ fun LoginScreen(
                     ) {
 
                         Text(
+
                             text =
                                 "SIGN IN",
 
-                            fontSize = 15.sp,
+                            fontSize =
+                                15.sp,
 
                             fontWeight =
                                 FontWeight.Bold
                         )
                     }
 
+
                     Spacer(
                         modifier =
                             Modifier.height(18.dp)
                     )
 
+
                     Text(
+
                         text =
                             "New to GuideChat?",
 
@@ -1036,13 +1123,16 @@ fun LoginScreen(
                         textAlign =
                             TextAlign.Center,
 
-                        fontSize = 13.sp,
+                        fontSize =
+                            13.sp,
 
                         color =
                             Color(0xFF6B756E)
                     )
 
+
                     TextButton(
+
                         onClick =
                             onCreateAccount,
 
@@ -1053,6 +1143,7 @@ fun LoginScreen(
                     ) {
 
                         Text(
+
                             text =
                                 "Create an account",
 
@@ -1066,16 +1157,20 @@ fun LoginScreen(
                 }
             }
 
+
             Spacer(
                 modifier =
                     Modifier.height(22.dp)
             )
 
+
             Text(
+
                 text =
                     "Secure communication for interns & mentors",
 
-                fontSize = 12.sp,
+                fontSize =
+                    12.sp,
 
                 color =
                     Color(0xFF6B756E),
@@ -1088,23 +1183,28 @@ fun LoginScreen(
 }
 
 
- //  REGISTER SCREEN
-
+// =============================================================
+// REGISTER SCREEN
+// =============================================================
 
 @Composable
 fun RegisterScreen(
     onBackToLogin: () -> Unit
 ) {
 
-    val context = LocalContext.current
+    val context =
+        LocalContext.current
 
-    val authRepository = remember {
-        AuthRepository()
-    }
+    val authRepository =
+        remember {
+            AuthRepository()
+        }
 
-    val userRepository = remember {
-        UserRepository()
-    }
+    val userRepository =
+        remember {
+            UserRepository()
+        }
+
 
     var name by remember {
         mutableStateOf("")
@@ -1134,16 +1234,25 @@ fun RegisterScreen(
         mutableStateOf(false)
     }
 
+
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFF8FBF9))
+
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Color(0xFFF8FBF9)
+                )
     ) {
 
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 24.dp),
+
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(
+                        horizontal = 24.dp
+                    ),
 
             horizontalAlignment =
                 Alignment.CenterHorizontally,
@@ -1152,39 +1261,52 @@ fun RegisterScreen(
                 Arrangement.Center
         ) {
 
+
+            // LOGO
+
             Box(
-                modifier = Modifier
-                    .size(68.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFCFFDDC)),
+
+                modifier =
+                    Modifier
+                        .size(68.dp)
+                        .clip(CircleShape)
+                        .background(
+                            Color(0xFFCFFDDC)
+                        ),
 
                 contentAlignment =
                     Alignment.Center
             ) {
 
                 Text(
+
                     text = "G",
 
                     color =
                         Color(0xFF2E6F40),
 
-                    fontSize = 32.sp,
+                    fontSize =
+                        32.sp,
 
                     fontWeight =
                         FontWeight.Bold
                 )
             }
 
+
             Spacer(
                 modifier =
                     Modifier.height(14.dp)
             )
 
+
             Text(
+
                 text =
                     "Create Account",
 
-                fontSize = 28.sp,
+                fontSize =
+                    28.sp,
 
                 fontWeight =
                     FontWeight.Bold,
@@ -1193,27 +1315,34 @@ fun RegisterScreen(
                     Color(0xFF253D2C)
             )
 
+
             Spacer(
                 modifier =
                     Modifier.height(5.dp)
             )
 
+
             Text(
+
                 text =
                     "Join your internship community",
 
-                fontSize = 14.sp,
+                fontSize =
+                    14.sp,
 
                 color =
                     Color(0xFF68BA7F)
             )
+
 
             Spacer(
                 modifier =
                     Modifier.height(24.dp)
             )
 
+
             Card(
+
                 modifier =
                     Modifier.fillMaxWidth(),
 
@@ -1228,17 +1357,24 @@ fun RegisterScreen(
 
                 elevation =
                     CardDefaults.cardElevation(
-                        defaultElevation = 5.dp
+                        defaultElevation =
+                            5.dp
                     )
             ) {
 
                 Column(
+
                     modifier =
                         Modifier.padding(22.dp)
                 ) {
 
+
+                    // NAME
+
                     OutlinedTextField(
-                        value = name,
+
+                        value =
+                            name,
 
                         onValueChange = {
                             name = it
@@ -1262,6 +1398,7 @@ fun RegisterScreen(
 
                         colors =
                             OutlinedTextFieldDefaults.colors(
+
                                 focusedBorderColor =
                                     Color(0xFF2E6F40),
 
@@ -1276,13 +1413,19 @@ fun RegisterScreen(
                             )
                     )
 
+
                     Spacer(
                         modifier =
                             Modifier.height(13.dp)
                     )
 
+
+                    // EMAIL
+
                     OutlinedTextField(
-                        value = email,
+
+                        value =
+                            email,
 
                         onValueChange = {
                             email = it
@@ -1312,6 +1455,7 @@ fun RegisterScreen(
 
                         colors =
                             OutlinedTextFieldDefaults.colors(
+
                                 focusedBorderColor =
                                     Color(0xFF2E6F40),
 
@@ -1326,13 +1470,19 @@ fun RegisterScreen(
                             )
                     )
 
+
                     Spacer(
                         modifier =
                             Modifier.height(13.dp)
                     )
 
+
+                    // PASSWORD
+
                     OutlinedTextField(
-                        value = password,
+
+                        value =
+                            password,
 
                         onValueChange = {
                             password = it
@@ -1353,8 +1503,11 @@ fun RegisterScreen(
 
                         visualTransformation =
                             if (passwordVisible) {
+
                                 VisualTransformation.None
+
                             } else {
+
                                 PasswordVisualTransformation()
                             },
 
@@ -1367,6 +1520,7 @@ fun RegisterScreen(
                         trailingIcon = {
 
                             TextButton(
+
                                 onClick = {
 
                                     passwordVisible =
@@ -1375,6 +1529,7 @@ fun RegisterScreen(
                             ) {
 
                                 Text(
+
                                     text =
                                         if (passwordVisible) {
                                             "Hide"
@@ -1393,6 +1548,7 @@ fun RegisterScreen(
 
                         colors =
                             OutlinedTextFieldDefaults.colors(
+
                                 focusedBorderColor =
                                     Color(0xFF2E6F40),
 
@@ -1407,12 +1563,17 @@ fun RegisterScreen(
                             )
                     )
 
+
                     Spacer(
                         modifier =
                             Modifier.height(13.dp)
                     )
 
+
+                    // CONFIRM PASSWORD
+
                     OutlinedTextField(
+
                         value =
                             confirmPassword,
 
@@ -1447,6 +1608,7 @@ fun RegisterScreen(
 
                         colors =
                             OutlinedTextFieldDefaults.colors(
+
                                 focusedBorderColor =
                                     Color(0xFF2E6F40),
 
@@ -1461,16 +1623,20 @@ fun RegisterScreen(
                             )
                     )
 
+
                     Spacer(
                         modifier =
                             Modifier.height(18.dp)
                     )
 
+
                     Text(
+
                         text =
                             "I am a...",
 
-                        fontSize = 14.sp,
+                        fontSize =
+                            14.sp,
 
                         fontWeight =
                             FontWeight.SemiBold,
@@ -1479,12 +1645,15 @@ fun RegisterScreen(
                             Color(0xFF253D2C)
                     )
 
+
                     Spacer(
                         modifier =
                             Modifier.height(4.dp)
                     )
 
+
                     Row(
+
                         modifier =
                             Modifier.fillMaxWidth(),
 
@@ -1492,7 +1661,11 @@ fun RegisterScreen(
                             Alignment.CenterVertically
                     ) {
 
+
+                        // INTERN
+
                         Row(
+
                             verticalAlignment =
                                 Alignment.CenterVertically,
 
@@ -1501,6 +1674,7 @@ fun RegisterScreen(
                         ) {
 
                             RadioButton(
+
                                 selected =
                                     selectedRole ==
                                             "Intern",
@@ -1512,15 +1686,22 @@ fun RegisterScreen(
                                 }
                             )
 
+
                             Text(
-                                text = "Intern",
+
+                                text =
+                                    "Intern",
 
                                 color =
                                     Color(0xFF253D2C)
                             )
                         }
 
+
+                        // MENTOR
+
                         Row(
+
                             verticalAlignment =
                                 Alignment.CenterVertically,
 
@@ -1529,6 +1710,7 @@ fun RegisterScreen(
                         ) {
 
                             RadioButton(
+
                                 selected =
                                     selectedRole ==
                                             "Mentor",
@@ -1540,8 +1722,11 @@ fun RegisterScreen(
                                 }
                             )
 
+
                             Text(
-                                text = "Mentor",
+
+                                text =
+                                    "Mentor",
 
                                 color =
                                     Color(0xFF253D2C)
@@ -1549,67 +1734,97 @@ fun RegisterScreen(
                         }
                     }
 
+
                     Spacer(
                         modifier =
                             Modifier.height(14.dp)
                     )
 
+
+                    // CREATE ACCOUNT
+
                     Button(
+
                         onClick = {
 
                             if (isCreatingAccount) {
                                 return@Button
                             }
 
+
                             when {
 
                                 name.isBlank() -> {
 
                                     Toast.makeText(
+
                                         context,
+
                                         "Please enter your name",
+
                                         Toast.LENGTH_SHORT
+
                                     ).show()
                                 }
+
 
                                 email.isBlank() -> {
 
                                     Toast.makeText(
+
                                         context,
+
                                         "Please enter your email",
+
                                         Toast.LENGTH_SHORT
+
                                     ).show()
                                 }
+
 
                                 password.length < 6 -> {
 
                                     Toast.makeText(
+
                                         context,
+
                                         "Password must be at least 6 characters",
+
                                         Toast.LENGTH_SHORT
+
                                     ).show()
                                 }
+
 
                                 password !=
                                         confirmPassword -> {
 
                                     Toast.makeText(
+
                                         context,
+
                                         "Passwords do not match",
+
                                         Toast.LENGTH_SHORT
+
                                     ).show()
                                 }
 
+
                                 else -> {
 
-                                    isCreatingAccount = true
+                                    isCreatingAccount =
+                                        true
+
 
                                     authRepository.register(
+
                                         email =
                                             email.trim(),
 
                                         password =
                                             password
+
                                     ) { success, error ->
 
                                         if (!success) {
@@ -1618,18 +1833,24 @@ fun RegisterScreen(
                                                 false
 
                                             Toast.makeText(
+
                                                 context,
+
                                                 error
                                                     ?: "Registration failed",
+
                                                 Toast.LENGTH_LONG
+
                                             ).show()
 
                                             return@register
                                         }
 
+
                                         val firebaseUser =
                                             authRepository
                                                 .getCurrentUser()
+
 
                                         if (
                                             firebaseUser ==
@@ -1640,13 +1861,18 @@ fun RegisterScreen(
                                                 false
 
                                             Toast.makeText(
+
                                                 context,
+
                                                 "Account created but user information was unavailable",
+
                                                 Toast.LENGTH_LONG
+
                                             ).show()
 
                                             return@register
                                         }
+
 
                                         val userProfile =
                                             UserProfile(
@@ -1675,24 +1901,33 @@ fun RegisterScreen(
                                                         .currentTimeMillis()
                                             )
 
+
                                         userRepository
                                             .createUserProfile(
+
                                                 userProfile
+
                                             ) {
+
                                                     profileCreated,
                                                     profileError ->
 
                                                 isCreatingAccount =
                                                     false
 
+
                                                 if (
                                                     profileCreated
                                                 ) {
 
                                                     Toast.makeText(
+
                                                         context,
+
                                                         "Account created successfully!",
+
                                                         Toast.LENGTH_SHORT
+
                                                     ).show()
 
                                                     onBackToLogin()
@@ -1700,10 +1935,14 @@ fun RegisterScreen(
                                                 } else {
 
                                                     Toast.makeText(
+
                                                         context,
+
                                                         profileError
                                                             ?: "Account created but profile failed",
+
                                                         Toast.LENGTH_LONG
+
                                                     ).show()
                                                 }
                                             }
@@ -1725,6 +1964,7 @@ fun RegisterScreen(
 
                         colors =
                             ButtonDefaults.buttonColors(
+
                                 containerColor =
                                     Color(0xFF2E6F40),
 
@@ -1737,6 +1977,7 @@ fun RegisterScreen(
                     ) {
 
                         Text(
+
                             text =
                                 if (isCreatingAccount) {
                                     "CREATING..."
@@ -1744,19 +1985,23 @@ fun RegisterScreen(
                                     "CREATE ACCOUNT"
                                 },
 
-                            fontSize = 14.sp,
+                            fontSize =
+                                14.sp,
 
                             fontWeight =
                                 FontWeight.Bold
                         )
                     }
 
+
                     Spacer(
                         modifier =
                             Modifier.height(8.dp)
                     )
 
+
                     TextButton(
+
                         onClick =
                             onBackToLogin,
 
@@ -1767,6 +2012,7 @@ fun RegisterScreen(
                     ) {
 
                         Text(
+
                             text =
                                 "Already have an account? Sign in",
 
